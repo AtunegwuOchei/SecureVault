@@ -46,8 +46,8 @@ export const activityLogs = pgTable("activity_logs", {
   userId: integer("user_id").notNull().references(() => users.id),
   action: text("action").notNull(), // 'create', 'update', 'delete', 'login', etc.
   details: text("details"),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
+  ipAddress: text("ip_address").notNull().default(''),
+  userAgent: text("user_agent").notNull().default(''),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

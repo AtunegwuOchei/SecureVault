@@ -50,7 +50,7 @@ export const configureSession = (app: any) => {
 
 // Authentication middleware
 export const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
-  if (req.session && req.session.userId) {
+  if (req.session && req.session.userId !== undefined) {
     return next();
   }
   
@@ -80,8 +80,8 @@ export const login = async (req: Request, res: Response) => {
       userId: user.id,
       action: 'login',
       details: 'User logged in successfully',
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'] || '',
+      ipAddress: String(req.ip || ''),
+      userAgent: String(req.headers['user-agent'] || ''),
     });
     
     // Set session
@@ -142,8 +142,8 @@ export const register = async (req: Request, res: Response) => {
       userId: user.id,
       action: 'register',
       details: 'User registered successfully',
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'] || '',
+      ipAddress: req.ip || null,
+      userAgent: req.headers['user-agent'] || null,
     });
     
     // Set session
