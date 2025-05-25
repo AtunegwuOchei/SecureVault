@@ -13,6 +13,7 @@ import PasswordVault from "@/pages/PasswordVault";
 import PasswordGenerator from "@/pages/PasswordGenerator";
 import SecurityDashboard from "@/pages/SecurityDashboard";
 import Settings from "@/pages/Settings";
+import DeviceIntegration from "@/pages/DeviceIntegration";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 
@@ -63,6 +64,14 @@ function Router() {
         {isAuthPage ? null : (
           <MainLayout>
             <Settings />
+          </MainLayout>
+        )}
+      </Route>
+      
+      <Route path="/devices">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <DeviceIntegration />
           </MainLayout>
         )}
       </Route>

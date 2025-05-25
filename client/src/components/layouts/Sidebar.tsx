@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
-import { X, Home, Lock, Key, Shield, Bell, Settings, Clock, Info } from "lucide-react";
+import { X, Home, Lock, Key, Shield, Bell, Settings, Clock, Info, Smartphone, Globe } from "lucide-react";
 
 interface SidebarProps {
   isVisible: boolean;
@@ -63,6 +63,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, isMobile, onClose, user })
           label: "Account Settings",
           icon: <Settings className="h-5 w-5 mr-3" />,
           path: "/settings"
+        },
+        {
+          label: "Mobile & Browser",
+          icon: <Smartphone className="h-5 w-5 mr-3" />,
+          path: "/devices"
         },
         {
           label: "Sync Settings",

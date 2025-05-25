@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { QRCodeSVG } from 'react-qr-code';
+import QRCode from 'react-qr-code';
 import { Input } from '@/components/ui/input';
 
 interface MobileAppIntegrationProps {
@@ -77,9 +77,9 @@ const MobileAppIntegration: React.FC<MobileAppIntegrationProps> = ({ onConnect }
           </p>
           <div className="flex justify-center">
             <div className="bg-white p-3 rounded-lg">
-              <QRCodeSVG 
+              <QRCode 
                 value="securevault://connect?token=demo123456789"
-                size={180}
+                style={{ height: "180px", width: "180px", maxWidth: "100%" }}
               />
             </div>
           </div>
