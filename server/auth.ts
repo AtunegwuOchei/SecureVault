@@ -8,8 +8,8 @@ import MemoryStore from 'memorystore';
 
 // Extend the session interface to include our custom properties
 declare module 'express-session' {
-  interface SessionData {
-    userId: number;
+  interface Session {
+    userId?: number;
   }
 }
 
@@ -80,8 +80,8 @@ export const login = async (req: Request, res: Response) => {
       userId: user.id,
       action: 'login',
       details: 'User logged in successfully',
-      ipAddress: String(req.ip || ''),
-      userAgent: String(req.headers['user-agent'] || ''),
+      ipAddress: req.ip || '',
+      userAgent: req.headers['user-agent'] || '',
     });
     
     // Set session
@@ -142,8 +142,8 @@ export const register = async (req: Request, res: Response) => {
       userId: user.id,
       action: 'register',
       details: 'User registered successfully',
-      ipAddress: req.ip || null,
-      userAgent: req.headers['user-agent'] || null,
+      ipAddress: req.ip || '',
+      userAgent: req.headers['user-agent'] || '',
     });
     
     // Set session
