@@ -83,7 +83,11 @@ function App() {
           staleTime: Infinity
         });
       } catch (error) {
-        window.location.href = '/login';
+        // Only redirect if not already on an auth page
+        const path = window.location.pathname;
+        if (path !== '/login' && path !== '/register') {
+          window.location.href = '/login';
+        }
       }
     };
     
