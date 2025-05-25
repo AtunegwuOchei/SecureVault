@@ -1,0 +1,105 @@
+import { Switch, Route, useLocation } from "wouter";
+import { queryClient } from "./lib/queryClient";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/components/ui/theme-provider";
+import { useEffect } from "react";
+
+import MainLayout from "@/components/layouts/MainLayout";
+import NotFound from "@/pages/not-found";
+import Dashboard from "@/pages/Dashboard";
+import PasswordVault from "@/pages/PasswordVault";
+import PasswordGenerator from "@/pages/PasswordGenerator";
+import SecurityDashboard from "@/pages/SecurityDashboard";
+import Settings from "@/pages/Settings";
+import Login from "@/pages/Login";
+import Register from "@/pages/Register";
+
+function Router() {
+  const [location] = useLocation();
+  const isAuthPage = location === "/login" || location === "/register";
+
+  return (
+    <Switch>
+      {/* Auth Routes */}
+      <Route path="/login" component={Login} />
+      <Route path="/register" component={Register} />
+      
+      {/* Protected Routes */}
+      <Route path="/">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <Dashboard />
+          </MainLayout>
+        )}
+      </Route>
+      
+      <Route path="/vault">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <PasswordVault />
+          </MainLayout>
+        )}
+      </Route>
+      
+      <Route path="/generator">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <PasswordGenerator />
+          </MainLayout>
+        )}
+      </Route>
+      
+      <Route path="/security">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <SecurityDashboard />
+          </MainLayout>
+        )}
+      </Route>
+      
+      <Route path="/settings">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <Settings />
+          </MainLayout>
+        )}
+      </Route>
+      
+      {/* Fallback to 404 */}
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function App() {
+  // Check authentication status on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        await queryClient.fetchQuery({ 
+          queryKey: ['/api/auth/me'],
+          staleTime: Infinity
+        });
+      } catch (error) {
+        window.location.href = '/login';
+      }
+    };
+    
+    checkAuth();
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider defaultTheme="light" storageKey="securevault-theme">
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+}
+
+export default App;
