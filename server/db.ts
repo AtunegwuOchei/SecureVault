@@ -5,11 +5,11 @@ import * as schema from "@shared/schema";
 
 neonConfig.webSocketConstructor = ws;
 
-if (!process.env.DATABASE_URL) {
+/* if (!process.env.DATABASE_URL) {
   throw new Error(
     "DATABASE_URL must be set. Did you forget to provision a database?",
   );
-}
+} */
 
 // Prevent multiple pool/db instances during development (hot reloads)
 const globalForDrizzle = globalThis as unknown as {
@@ -18,8 +18,11 @@ const globalForDrizzle = globalThis as unknown as {
 };
 
 export const pool =
-  globalForDrizzle.pool ??
-  new Pool({ connectionString: process.env.DATABASE_URL });
+	globalForDrizzle.pool ??
+	new Pool({
+		connectionString:
+			"postgresql://neondb_owner:npg_rJ0c6vnBQHIV@ep-patient-hat-abrzz4ri-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require",
+	});
 export const db = globalForDrizzle.db ?? drizzle({ client: pool, schema });
 
 if (process.env.NODE_ENV !== "production") {

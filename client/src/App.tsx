@@ -26,7 +26,7 @@ function Router() {
       {/* Auth Routes */}
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
-      
+
       {/* Protected Routes */}
       <Route path="/">
         {isAuthPage ? null : (
@@ -35,7 +35,7 @@ function Router() {
           </MainLayout>
         )}
       </Route>
-      
+
       <Route path="/vault">
         {isAuthPage ? null : (
           <MainLayout>
@@ -43,7 +43,7 @@ function Router() {
           </MainLayout>
         )}
       </Route>
-      
+
       <Route path="/generator">
         {isAuthPage ? null : (
           <MainLayout>
@@ -51,7 +51,7 @@ function Router() {
           </MainLayout>
         )}
       </Route>
-      
+
       <Route path="/security">
         {isAuthPage ? null : (
           <MainLayout>
@@ -59,7 +59,7 @@ function Router() {
           </MainLayout>
         )}
       </Route>
-      
+
       <Route path="/settings">
         {isAuthPage ? null : (
           <MainLayout>
@@ -67,7 +67,7 @@ function Router() {
           </MainLayout>
         )}
       </Route>
-      
+
       <Route path="/devices">
         {isAuthPage ? null : (
           <MainLayout>
@@ -75,7 +75,7 @@ function Router() {
           </MainLayout>
         )}
       </Route>
-      
+
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
@@ -84,10 +84,10 @@ function Router() {
 
 function App() {
   // Check authentication status on mount
- /* useEffect(() => {
+ useEffect(() => {
     const checkAuth = async () => {
       try {
-        await queryClient.fetchQuery({ 
+        await queryClient.fetchQuery({
           queryKey: ['/api/auth/me'],
           staleTime: Infinity
         });
@@ -99,9 +99,9 @@ function App() {
         }
       }
     };
-    
+
     checkAuth();
-  }, []); */
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

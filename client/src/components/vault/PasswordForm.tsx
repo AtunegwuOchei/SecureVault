@@ -17,7 +17,6 @@ import { insertPasswordSchema, updatePasswordSchema, type Password } from "@shar
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { encrypt } from "@/lib/encryption";
 import { calculatePasswordStrength } from "@/lib/passwordUtils";
 import PasswordStrengthMeter from "@/components/common/PasswordStrengthMeter";
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
@@ -42,7 +41,7 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
   const [passwordStrength, setPasswordStrength] = useState(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const isEditing = !!password;
   const title = isEditing ? "Edit Password" : "Add Password";
 
@@ -106,6 +105,35 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
     }
   }, [generatedPassword, setValue]);
 
+  // Reset form when dialog opens/closes or password changes
+  useEffect(() => {
+    if (open) {
+      if (password) {
+        // Editing existing password
+        setValue("title", password.title);
+        setValue("username", password.username || "");
+        setValue("encryptedPassword", password.encryptedPassword);
+        setValue("confirmPassword", password.encryptedPassword);
+        setValue("url", password.url || "");
+        setValue("notes", password.notes || "");
+        setValue("category", password.category || "");
+        setValue("isFavorite", password.isFavorite || false);
+      } else {
+        // Adding new password
+        reset({
+          title: "",
+          username: "",
+          encryptedPassword: generatedPassword || "",
+          confirmPassword: generatedPassword || "",
+          url: "",
+          notes: "",
+          category: "",
+          isFavorite: false
+        });
+      }
+    }
+  }, [open, password, generatedPassword, setValue, reset]);
+
   // Create password mutation
   const createPasswordMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -118,8 +146,7 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
         title: "Password created",
         description: "Your password has been saved successfully",
       });
-      reset();
-      onClose();
+      handleClose();
     },
     onError: (error: any) => {
       toast({
@@ -142,8 +169,7 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
         title: "Password updated",
         description: "Your password has been updated successfully",
       });
-      reset();
-      onClose();
+      handleClose();
     },
     onError: (error: any) => {
       toast({
@@ -154,20 +180,19 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
     },
   });
 
+  // Handle close
+  const handleClose = () => {
+    reset();
+    setPasswordStrength(0);
+    onClose();
+  };
+
   // Form submission handler
   const onSubmit = async (data: any) => {
     try {
       // Remove confirm password field before sending to server
       const { confirmPassword, ...submitData } = data;
-      
-      // Client-side encryption (note: in a real app, you might want to encrypt this on the server only)
-      // Here we're assuming encrypted passwords in the form are not yet encrypted
-      // For simplicity of this example, we're only pretending to encrypt
-      
-      // Strength calculation
-      const strength = calculatePasswordStrength(data.encryptedPassword);
-      submitData.strength = strength;
-      
+
       if (isEditing) {
         await updatePasswordMutation.mutateAsync(submitData);
       } else {
@@ -179,16 +204,16 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
           <div className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="title">Title</Label>
+              <Label htmlFor="title">Title *</Label>
               <Input
                 id="title"
                 placeholder="e.g., Google, Amazon, Netflix"
@@ -198,9 +223,9 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
                 <p className="text-sm text-red-500">{errors.title.message?.toString()}</p>
               )}
             </div>
-            
+
             <div className="grid gap-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">Username / Email</Label>
               <Input
                 id="username"
                 placeholder="Email or username"
@@ -210,9 +235,9 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
                 <p className="text-sm text-red-500">{errors.username.message?.toString()}</p>
               )}
             </div>
-            
+
             <div className="grid gap-2">
-              <Label htmlFor="encryptedPassword">Password</Label>
+              <Label htmlFor="encryptedPassword">Password *</Label>
               <div className="relative">
                 <Input
                   id="encryptedPassword"
@@ -249,9 +274,9 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
               )}
               <PasswordStrengthMeter strength={passwordStrength} />
             </div>
-            
+
             <div className="grid gap-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword">Confirm Password *</Label>
               <div className="relative">
                 <Input
                   id="confirmPassword"
@@ -264,7 +289,7 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
                 <p className="text-sm text-red-500">{errors.confirmPassword.message?.toString()}</p>
               )}
             </div>
-            
+
             <div className="grid gap-2">
               <Label htmlFor="url">Website URL</Label>
               <Input
@@ -276,7 +301,7 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
                 <p className="text-sm text-red-500">{errors.url.message?.toString()}</p>
               )}
             </div>
-            
+
             <div className="grid gap-2">
               <Label htmlFor="category">Category</Label>
               <Input
@@ -288,7 +313,7 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
                 <p className="text-sm text-red-500">{errors.category.message?.toString()}</p>
               )}
             </div>
-            
+
             <div className="grid gap-2">
               <Label htmlFor="notes">Notes</Label>
               <Textarea
@@ -300,7 +325,7 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
                 <p className="text-sm text-red-500">{errors.notes.message?.toString()}</p>
               )}
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="isFavorite"
@@ -309,12 +334,12 @@ const PasswordForm: React.FC<PasswordFormProps> = ({
               <Label htmlFor="isFavorite">Mark as favorite</Label>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isSubmitting}
             >
               Cancel

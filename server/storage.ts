@@ -1,14 +1,14 @@
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { db } from "./db";
-import { 
-  users, 
-  passwords, 
-  securityAlerts, 
+import {
+  users,
+  passwords,
+  securityAlerts,
   activityLogs,
-  type User, 
-  type InsertUser, 
-  type Password, 
-  type InsertPassword, 
+  type User,
+  type InsertUser,
+  type Password,
+  type InsertPassword,
   type UpdatePassword,
   type SecurityAlert,
   type ActivityLog
@@ -18,26 +18,27 @@ export interface IStorage {
   // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserLastLogin(id: number): Promise<void>;
   updateUserPremiumStatus(id: number, isPremium: boolean): Promise<void>;
-  
+
   // Password methods
   getPasswordsByUserId(userId: number): Promise<Password[]>;
   getPasswordById(id: number, userId: number): Promise<Password | undefined>;
-  createPassword(password: InsertPassword, userId: number): Promise<Password>;
-  updatePassword(id: number, userId: number, password: UpdatePassword): Promise<Password | undefined>;
+  createPassword(password: InsertPassword & { strength?: number }, userId: number): Promise<Password>;
+  updatePassword(id: number, userId: number, password: UpdatePassword & { strength?: number }): Promise<Password | undefined>;
   deletePassword(id: number, userId: number): Promise<boolean>;
-  
+
   // Security Alert methods
   getSecurityAlertsByUserId(userId: number): Promise<SecurityAlert[]>;
   createSecurityAlert(alert: Omit<SecurityAlert, 'id' | 'createdAt'>): Promise<SecurityAlert>;
   resolveSecurityAlert(id: number, userId: number): Promise<boolean>;
-  
+
   // Activity Log methods
   getActivityLogsByUserId(userId: number, limit?: number): Promise<ActivityLog[]>;
   createActivityLog(log: Omit<ActivityLog, 'id' | 'createdAt'>): Promise<ActivityLog>;
-  
+
   // Password health methods
   getPasswordStats(userId: number): Promise<{
     total: number;
@@ -59,28 +60,40 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
-      .values(insertUser)
+      .values({
+        username: insertUser.username,
+        password_hash: insertUser.password, // This should be hashed in auth.ts
+        email: insertUser.email,
+        name: insertUser.name,
+        masterKeyHash: insertUser.masterKeyHash,
+        salt: insertUser.salt,
+      })
       .returning();
     return user;
   }
-  
+
   async updateUserLastLogin(id: number): Promise<void> {
     await db
       .update(users)
       .set({ lastLogin: new Date() })
       .where(eq(users.id, id));
   }
-  
+
   async updateUserPremiumStatus(id: number, isPremium: boolean): Promise<void> {
     await db
       .update(users)
       .set({ isPremium })
       .where(eq(users.id, id));
   }
-  
+
   // Password methods
   async getPasswordsByUserId(userId: number): Promise<Password[]> {
     return db
@@ -89,7 +102,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(passwords.userId, userId))
       .orderBy(desc(passwords.updatedAt));
   }
-  
+
   async getPasswordById(id: number, userId: number): Promise<Password | undefined> {
     const [password] = await db
       .select()
@@ -97,16 +110,21 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(passwords.id, id), eq(passwords.userId, userId)));
     return password;
   }
-  
-  async createPassword(password: InsertPassword, userId: number): Promise<Password> {
+
+  async createPassword(password: InsertPassword & { strength?: number }, userId: number): Promise<Password> {
     const [newPassword] = await db
       .insert(passwords)
-      .values({ ...password, userId })
+      .values({
+        ...password,
+        userId,
+        strength: password.strength || 0,
+        isFavorite: password.isFavorite || false,
+      })
       .returning();
     return newPassword;
   }
-  
-  async updatePassword(id: number, userId: number, password: UpdatePassword): Promise<Password | undefined> {
+
+  async updatePassword(id: number, userId: number, password: UpdatePassword & { strength?: number }): Promise<Password | undefined> {
     const [updatedPassword] = await db
       .update(passwords)
       .set({ ...password, updatedAt: new Date() })
@@ -114,7 +132,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedPassword;
   }
-  
+
   async deletePassword(id: number, userId: number): Promise<boolean> {
     const result = await db
       .delete(passwords)
@@ -122,7 +140,7 @@ export class DatabaseStorage implements IStorage {
       .returning({ id: passwords.id });
     return result.length > 0;
   }
-  
+
   // Security Alert methods
   async getSecurityAlertsByUserId(userId: number): Promise<SecurityAlert[]> {
     return db
@@ -131,15 +149,18 @@ export class DatabaseStorage implements IStorage {
       .where(eq(securityAlerts.userId, userId))
       .orderBy(desc(securityAlerts.createdAt));
   }
-  
+
   async createSecurityAlert(alert: Omit<SecurityAlert, 'id' | 'createdAt'>): Promise<SecurityAlert> {
     const [newAlert] = await db
       .insert(securityAlerts)
-      .values(alert)
+      .values({
+        ...alert,
+        createdAt: new Date(),
+      })
       .returning();
     return newAlert;
   }
-  
+
   async resolveSecurityAlert(id: number, userId: number): Promise<boolean> {
     const result = await db
       .update(securityAlerts)
@@ -148,7 +169,7 @@ export class DatabaseStorage implements IStorage {
       .returning({ id: securityAlerts.id });
     return result.length > 0;
   }
-  
+
   // Activity Log methods
   async getActivityLogsByUserId(userId: number, limit: number = 10): Promise<ActivityLog[]> {
     return db
@@ -158,15 +179,18 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(activityLogs.createdAt))
       .limit(limit);
   }
-  
+
   async createActivityLog(log: Omit<ActivityLog, 'id' | 'createdAt'>): Promise<ActivityLog> {
     const [newLog] = await db
       .insert(activityLogs)
-      .values(log)
+      .values({
+        ...log,
+        createdAt: new Date(),
+      })
       .returning();
     return newLog;
   }
-  
+
   // Password health methods
   async getPasswordStats(userId: number): Promise<{
     total: number;
@@ -175,20 +199,20 @@ export class DatabaseStorage implements IStorage {
     reused: number;
   }> {
     const allPasswords = await this.getPasswordsByUserId(userId);
-    
+
     const total = allPasswords.length;
-    const strong = allPasswords.filter(p => p.strength >= 80).length;
-    const weak = allPasswords.filter(p => p.strength < 50).length;
-    
+    const strong = allPasswords.filter(p => (p.strength || 0) >= 80).length;
+    const weak = allPasswords.filter(p => (p.strength || 0) < 50).length;
+
     // Find reused passwords (same encrypted value appears multiple times)
     const passwordMap = new Map<string, number>();
     allPasswords.forEach(p => {
       const count = passwordMap.get(p.encryptedPassword) || 0;
       passwordMap.set(p.encryptedPassword, count + 1);
     });
-    
-    const reused = [...passwordMap.values()].filter(count => count > 1).length;
-    
+
+    const reused = Array.from(passwordMap.values()).filter(count => count > 1).length;
+
     return { total, strong, weak, reused };
   }
 }

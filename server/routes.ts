@@ -1,4 +1,4 @@
-import express, { type Express, type Request, type Response } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import {
@@ -11,18 +11,17 @@ import {
 } from "./auth";
 import {
   calculatePasswordStrength,
-  generatePassword,
+  generatePassword as generatePasswordUtil,
   isValidEmail,
   isStrongPassword,
 } from "./utils";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import {
   insertPasswordSchema,
   updatePasswordSchema,
   loginUserSchema,
   insertUserSchema,
   passwordGeneratorSchema,
+  type PasswordGenerator,
 } from "@shared/schema";
 
 // Rate limiting store (simple in-memory for demo; replace with Redis or DB in production)
@@ -31,24 +30,13 @@ const MAX_ATTEMPTS = 5;
 const BLOCK_TIME_MS = 15 * 60 * 1000; // 15 mins block
 
 interface AuthenticatedRequest extends Request {
-  session: {
+  session: Request['session'] & {
     userId?: number;
   };
 }
 
 function handleServerError(res: Response, message = "Internal Server Error") {
   return res.status(500).json({ message });
-}
-
-// Simple email format validation helper (could use a lib or regex)
-function validateEmail(email: string): boolean {
-  // You may already have this in utils, but double-check
-  return isValidEmail(email);
-}
-
-// Check password strength helper
-function validatePasswordStrength(password: string): boolean {
-  return isStrongPassword(password);
 }
 
 // Rate limiter middleware for login route
@@ -71,8 +59,7 @@ async function loginRateLimiter(req: Request, res: Response, next: () => void) {
 
   if (attemptInfo.count >= MAX_ATTEMPTS) {
     return res.status(429).json({
-      message:
-        "Too many login attempts. Please try again after 15 minutes.",
+      message: "Too many login attempts. Please try again after 15 minutes.",
     });
   }
 
@@ -98,24 +85,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // Call your login logic
-        const success = await login(req, res);
-        if (!success) {
-          // Increment attempt count on failure
-          const attemptInfo = res.locals.loginAttemptInfo;
-          attemptInfo.count++;
-          return res.status(401).json({ message: "Invalid credentials" });
-        }
+        // Call login logic and check result properly
+        await login(req, res);
 
-        // Reset attempt count on success
+        // If we get here, login was successful
         const attemptInfo = res.locals.loginAttemptInfo;
-        attemptInfo.count = 0;
+        if (attemptInfo) {
+          attemptInfo.count = 0;
+        }
 
       } catch (error) {
         console.error(
           "Login error:",
           error instanceof Error ? error.message : error
         );
+
+        // Increment attempt count on failure
+        const attemptInfo = res.locals.loginAttemptInfo;
+        if (attemptInfo) {
+          attemptInfo.count++;
+        }
+
         return handleServerError(res, "An error occurred during login");
       }
     }
@@ -132,14 +122,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { email, password } = result.data;
 
-      if (!validateEmail(email)) {
+      if (!isValidEmail(email)) {
         return res.status(400).json({ message: "Invalid email format" });
       }
 
-      if (!validatePasswordStrength(password)) {
+      if (!isStrongPassword(password)) {
         return res.status(400).json({
-          message:
-            "Password is too weak. It must have uppercase, lowercase, numbers, symbols and be at least 8 characters long.",
+          message: "Password is too weak. It must have uppercase, lowercase, numbers, symbols and be at least 8 characters long.",
         });
       }
 
@@ -184,16 +173,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.session.userId;
-        if (!userId)
-          return res.status(401).json({ message: "Unauthorized" });
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
         const passwords = await storage.getPasswordsByUserId(userId);
         res.json(passwords);
       } catch (error) {
-        console.error(
-          "Get passwords error:",
-          error instanceof Error ? error.message : error
-        );
+        console.error("Get passwords error:", error);
         return handleServerError(res, "Failed to retrieve passwords");
       }
     }
@@ -205,8 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.session.userId;
-        if (!userId)
-          return res.status(401).json({ message: "Unauthorized" });
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
         const passwordId = parseInt(req.params.id);
         if (isNaN(passwordId) || passwordId <= 0) {
@@ -220,10 +204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         res.json(password);
       } catch (error) {
-        console.error(
-          "Get password error:",
-          error instanceof Error ? error.message : error
-        );
+        console.error("Get password error:", error);
         return handleServerError(res, "Failed to retrieve password");
       }
     }
@@ -235,8 +216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.session.userId;
-        if (!userId)
-          return res.status(401).json({ message: "Unauthorized" });
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
         const result = insertPasswordSchema.safeParse(req.body);
         if (!result.success) {
@@ -245,39 +225,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // Validate password strength on create
-        if (
-          !validatePasswordStrength(
-            result.data.encryptedPassword // or decrypt if needed here
-          )
-        ) {
-          return res.status(400).json({
-            message:
-              "Password is too weak. It must have uppercase, lowercase, numbers, symbols and be at least 8 characters long.",
-          });
-        }
+        // Calculate password strength and add it to the data
+        const strength = calculatePasswordStrength(result.data.encryptedPassword);
+        const passwordData = { ...result.data, strength };
 
-        const newPassword = await storage.createPassword(
-          { ...result.data },
-          userId
-        );
+        const newPassword = await storage.createPassword(passwordData, userId);
 
         // Log activity
         await storage.createActivityLog({
           userId,
           action: "create_password",
           details: `Created password for ${newPassword.title}`,
-          ipAddress:
-            (req.headers["x-forwarded-for"] || req.ip) as string || "",
+          ipAddress: (req.headers["x-forwarded-for"] || req.ip) as string || "",
           userAgent: req.headers["user-agent"] || "",
         });
 
         res.status(201).json(newPassword);
       } catch (error) {
-        console.error(
-          "Create password error:",
-          error instanceof Error ? error.message : error
-        );
+        console.error("Create password error:", error);
         return handleServerError(res, "Failed to create password");
       }
     }
@@ -289,8 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.session.userId;
-        if (!userId)
-          return res.status(401).json({ message: "Unauthorized" });
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
         const passwordId = parseInt(req.params.id);
         if (isNaN(passwordId) || passwordId <= 0) {
@@ -304,21 +268,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // Validate password strength on update
-        if (
-          result.data.encryptedPassword &&
-          !validatePasswordStrength(result.data.encryptedPassword)
-        ) {
-          return res.status(400).json({
-            message:
-              "Password is too weak. It must have uppercase, lowercase, numbers, symbols and be at least 8 characters long.",
-          });
+        // Calculate strength if password is being updated
+        let updateData = result.data;
+        if (result.data.encryptedPassword) {
+          const strength = calculatePasswordStrength(result.data.encryptedPassword);
+          updateData = { ...result.data, strength } as typeof result.data & { strength: number };
         }
 
         const updatedPassword = await storage.updatePassword(
           passwordId,
           userId,
-          result.data
+          updateData
         );
 
         if (!updatedPassword) {
@@ -330,17 +290,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId,
           action: "update_password",
           details: `Updated password for ${updatedPassword.title}`,
-          ipAddress:
-            (req.headers["x-forwarded-for"] || req.ip) as string || "",
+          ipAddress: (req.headers["x-forwarded-for"] || req.ip) as string || "",
           userAgent: req.headers["user-agent"] || "",
         });
 
         res.json(updatedPassword);
       } catch (error) {
-        console.error(
-          "Update password error:",
-          error instanceof Error ? error.message : error
-        );
+        console.error("Update password error:", error);
         return handleServerError(res, "Failed to update password");
       }
     }
@@ -352,8 +308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.session.userId;
-        if (!userId)
-          return res.status(401).json({ message: "Unauthorized" });
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
         const passwordId = parseInt(req.params.id);
         if (isNaN(passwordId) || passwordId <= 0) {
@@ -370,65 +325,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId,
           action: "delete_password",
           details: `Deleted password with id ${passwordId}`,
-          ipAddress:
-            (req.headers["x-forwarded-for"] || req.ip) as string || "",
+          ipAddress: (req.headers["x-forwarded-for"] || req.ip) as string || "",
           userAgent: req.headers["user-agent"] || "",
         });
 
         res.json({ message: "Password deleted successfully" });
       } catch (error) {
-        console.error(
-          "Delete password error:",
-          error instanceof Error ? error.message : error
-        );
+        console.error("Delete password error:", error);
         return handleServerError(res, "Failed to delete password");
       }
     }
   );
 
-  // ----- ALERTS -----
+  // ----- STATS ROUTES -----
   app.get(
-    "/api/alerts",
+    "/api/password-stats",
     isAuthenticated,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.session.userId;
-        if (!userId)
-          return res.status(401).json({ message: "Unauthorized" });
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-        const alerts = await storage.getAlertsByUserId(userId);
+        const stats = await storage.getPasswordStats(userId);
+        res.json(stats);
+      } catch (error) {
+        console.error("Get password stats error:", error);
+        return handleServerError(res, "Failed to retrieve password statistics");
+      }
+    }
+  );
+
+  // ----- SECURITY ALERTS ROUTES -----
+  app.get(
+    "/api/security-alerts",
+    isAuthenticated,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const alerts = await storage.getSecurityAlertsByUserId(userId);
         res.json(alerts);
       } catch (error) {
-        console.error(
-          "Get alerts error:",
-          error instanceof Error ? error.message : error
-        );
-        return handleServerError(res, "Failed to retrieve alerts");
+        console.error("Get security alerts error:", error);
+        return handleServerError(res, "Failed to retrieve security alerts");
       }
     }
   );
 
   app.post(
-    "/api/alerts/:id/resolve",
+    "/api/security-alerts/:id/resolve",
     isAuthenticated,
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.session.userId;
-        if (!userId)
-          return res.status(401).json({ message: "Unauthorized" });
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
         const alertId = parseInt(req.params.id);
         if (isNaN(alertId) || alertId <= 0) {
           return res.status(400).json({ message: "Invalid alert ID" });
         }
 
-        await storage.resolveAlert(alertId, userId);
+        const success = await storage.resolveSecurityAlert(alertId, userId);
+        if (!success) {
+          return res.status(404).json({ message: "Security alert not found" });
+        }
+
         res.json({ message: "Alert resolved successfully" });
       } catch (error) {
-        console.error(
-          "Resolve alert error:",
-          error instanceof Error ? error.message : error
-        );
+        console.error("Resolve alert error:", error);
         return handleServerError(res, "Failed to resolve alert");
       }
     }
@@ -441,20 +406,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const userId = req.session.userId;
-        if (!userId)
-          return res.status(401).json({ message: "Unauthorized" });
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-        const logs = await storage.getActivityLogsByUserId(userId);
+        const logs = await storage.getActivityLogsByUserId(userId, 20);
         res.json(logs);
       } catch (error) {
-        console.error(
-          "Get activity logs error:",
-          error instanceof Error ? error.message : error
-        );
+        console.error("Get activity logs error:", error);
         return handleServerError(res, "Failed to retrieve activity logs");
       }
     }
   );
+
+  // Add a health check endpoint
+app.get("/api/health", (req: Request, res: Response) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
 
   // ----- PASSWORD GENERATOR -----
   app.post(
@@ -469,19 +439,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        const password = generatePassword(result.data);
+        const { length, includeUppercase, includeLowercase, includeNumbers, includeSymbols } = result.data;
+
+        const password = generatePasswordUtil(
+          length,
+          includeUppercase,
+          includeLowercase,
+          includeNumbers,
+          includeSymbols
+        );
+
         const strength = calculatePasswordStrength(password);
 
         res.json({ password, strength });
       } catch (error) {
-        console.error(
-          "Generate password error:",
-          error instanceof Error ? error.message : error
-        );
+        console.error("Generate password error:", error);
         return handleServerError(res, "Failed to generate password");
       }
     }
   );
+
+  // Add CORS headers middleware if needed
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(200);
+    } else {
+      next();
+    }
+  });
+
+  app.use((error: any, req: Request, res: Response, next: NextFunction) => {
+    console.error('Unhandled error:', error);
+
+    if (res.headersSent) {
+      return next(error);
+    }
+
+    res.status(500).json({
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  });
 
   // Start HTTP server and return it for app.listen usage
   return createServer(app);

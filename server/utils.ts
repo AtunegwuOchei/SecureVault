@@ -1,17 +1,6 @@
-import CryptoJS from "crypto-js";
 import bcrypt from "bcrypt";
 
 const SALT_ROUNDS = 10;
-
-// AES-256 encryption for passwords
-export const encrypt = (text: string, key: string): string => {
-  return CryptoJS.AES.encrypt(text, key).toString();
-};
-
-export const decrypt = (ciphertext: string, key: string): string => {
-  const bytes = CryptoJS.AES.decrypt(ciphertext, key);
-  return bytes.toString(CryptoJS.enc.Utf8);
-};
 
 // Password hashing with bcrypt
 export const hashPassword = async (
@@ -27,11 +16,6 @@ export const comparePassword = async (
   hash: string,
 ): Promise<boolean> => {
   return await bcrypt.compare(password, hash);
-};
-
-// Generate salt for encryption
-export const generateSalt = (length: number = 16): string => {
-  return CryptoJS.lib.WordArray.random(length).toString();
 };
 
 // Password strength calculator (0-100)
@@ -58,7 +42,7 @@ export const calculatePasswordStrength = (password: string): number => {
   return Math.max(0, Math.min(100, score));
 };
 
-// Password generator
+// Password generator - Fixed to accept proper parameters
 export const generatePassword = (
   length: number = 16,
   includeUppercase: boolean = true,
@@ -80,27 +64,25 @@ export const generatePassword = (
   if (chars.length === 0) chars = lowercase;
 
   let password = "";
-  const randomValues = new Uint32Array(length);
-  crypto.getRandomValues(randomValues);
+
+  // Use crypto.getRandomValues for better randomness
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
 
   for (let i = 0; i < length; i++) {
-    password += chars[randomValues[i] % chars.length];
+    password += chars[array[i] % chars.length];
   }
 
   return password;
 };
 
-////////////////////////////////////////////////////
-// ✅ NEW ADDITIONS BELOW
-////////////////////////////////////////////////////
-
-// ✅ Email format validator
+// Email format validator
 export const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
 
-// ✅ Password strength threshold validator
+// Password strength threshold validator
 export const isStrongPassword = (
   password: string,
   minStrength: number = 60,
@@ -109,7 +91,7 @@ export const isStrongPassword = (
   return strength >= minStrength;
 };
 
-// ✅ Basic in-memory rate-limiting/account lockout
+// Basic in-memory rate-limiting/account lockout
 type LoginAttempts = {
   [email: string]: {
     attempts: number;
