@@ -22,13 +22,13 @@ const Register: React.FC = () => {
   const [passwordStrength, setPasswordStrength] = useState(0);
 
   // Form validation with react-hook-form and zod
-  const { 
-    register, 
-    handleSubmit, 
+  const {
+    register,
+    handleSubmit,
     watch,
     formState: { errors, isSubmitting }
   } = useForm({
-    resolver: zodResolver(insertUserSchema),
+    //resolver: zodResolver(insertUserSchema),
     defaultValues: {
       username: "",
       email: "",
@@ -42,7 +42,7 @@ const Register: React.FC = () => {
 
   // Watch password for strength calculation
   const watchPassword = watch("password");
-  
+
   // Calculate password strength when password changes
   React.useEffect(() => {
     if (watchPassword) {
@@ -84,7 +84,7 @@ const Register: React.FC = () => {
       masterKeyHash: data.password, // This is just for the demo, in reality you'd hash this properly
       salt: "placeholder-salt-value", // This is just for the demo
     };
-    
+
     await registerMutation.mutateAsync(submitData);
   };
 
@@ -100,7 +100,7 @@ const Register: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">SecureVault</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">Create your secure password vault</p>
         </div>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>Sign Up</CardTitle>
@@ -122,7 +122,7 @@ const Register: React.FC = () => {
                   <p className="text-sm text-red-500">{errors.username.message?.toString()}</p>
                 )}
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -136,7 +136,7 @@ const Register: React.FC = () => {
                   <p className="text-sm text-red-500">{errors.email.message?.toString()}</p>
                 )}
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name (Optional)</Label>
                 <Input
@@ -149,7 +149,7 @@ const Register: React.FC = () => {
                   <p className="text-sm text-red-500">{errors.name.message?.toString()}</p>
                 )}
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="password">Master Password</Label>
                 <div className="relative">
@@ -181,7 +181,7 @@ const Register: React.FC = () => {
                   </p>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm Master Password</Label>
                 <div className="relative">
@@ -206,7 +206,7 @@ const Register: React.FC = () => {
                   <p className="text-sm text-red-500">{errors.confirmPassword.message?.toString()}</p>
                 )}
               </div>
-              
+
               <Button
                 type="submit"
                 className="w-full"
@@ -232,7 +232,7 @@ const Register: React.FC = () => {
             </p>
           </CardFooter>
         </Card>
-        
+
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             By creating an account, you agree to our{" "}

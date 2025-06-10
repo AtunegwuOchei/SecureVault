@@ -24,7 +24,7 @@ const PasswordGenerator: React.FC<PasswordGeneratorProps> = ({
   title = "Password Generator",
 }) => {
   const [password, setPassword] = useState("");
-  const [length, setLength] = useState(14);
+  const [length, setLength] = useState(16);
   const [strength, setStrength] = useState(0);
   const [options, setOptions] = useState({
     uppercase: true,
@@ -32,10 +32,10 @@ const PasswordGenerator: React.FC<PasswordGeneratorProps> = ({
     numbers: true,
     symbols: true,
   });
-  
+
   const { onCopy, hasCopied } = useClipboard();
-  
-  // Generate password mutation
+
+  // Generate password mutation (fallback to server-side if available)
   const generatePasswordMutation = useMutation({
     mutationFn: async (params: any) => {
       const response = await apiRequest('POST', '/api/generate-password', params);
@@ -47,16 +47,11 @@ const PasswordGenerator: React.FC<PasswordGeneratorProps> = ({
       setStrength(data.strength);
     },
     onError: (error) => {
-      console.error('Password generation error:', error);
+      console.error('Server password generation failed, using client-side:', error);
       // Fallback to client-side generation if server fails
       generatePasswordLocally();
     },
   });
-
-  // Generate password on component mount
-  useEffect(() => {
-    handleGeneratePassword();
-  }, []);
 
   // Generate password locally as fallback
   const generatePasswordLocally = () => {
@@ -73,13 +68,19 @@ const PasswordGenerator: React.FC<PasswordGeneratorProps> = ({
 
   // Handle password generation with server API or local fallback
   const handleGeneratePassword = () => {
-    generatePasswordMutation.mutate({
-      length,
-      includeUppercase: options.uppercase,
-      includeLowercase: options.lowercase,
-      includeNumbers: options.numbers,
-      includeSymbols: options.symbols,
-    });
+    // Try server-side generation first, with client-side fallback
+    if (process.env.NODE_ENV === 'development') {
+      generatePasswordMutation.mutate({
+        length,
+        includeUppercase: options.uppercase,
+        includeLowercase: options.lowercase,
+        includeNumbers: options.numbers,
+        includeSymbols: options.symbols,
+      });
+    } else {
+      // In production or if server is not available, use client-side
+      generatePasswordLocally();
+    }
   };
 
   // Handle option changes
@@ -88,27 +89,68 @@ const PasswordGenerator: React.FC<PasswordGeneratorProps> = ({
     if (!value && Object.values(options).filter(Boolean).length === 1 && options[option]) {
       return;
     }
-    
-    setOptions((prev) => ({ ...prev, [option]: value }));
+
+    const newOptions = { ...options, [option]: value };
+    setOptions(newOptions);
+
+    // Regenerate password with new options
+    if (password) {
+      const newPassword = generatePassword(
+        length,
+        newOptions.uppercase,
+        newOptions.lowercase,
+        newOptions.numbers,
+        newOptions.symbols
+      );
+      setPassword(newPassword);
+      setStrength(calculatePasswordStrength(newPassword));
+    }
+  };
+
+  // Handle length change
+  const handleLengthChange = (newLength: number) => {
+    setLength(newLength);
+
+    // Regenerate password with new length
+    if (password) {
+      const newPassword = generatePassword(
+        newLength,
+        options.uppercase,
+        options.lowercase,
+        options.numbers,
+        options.symbols
+      );
+      setPassword(newPassword);
+      setStrength(calculatePasswordStrength(newPassword));
+    }
   };
 
   // Handle copy button click
   const handleCopy = () => {
-    onCopy(password);
+    if (password) {
+      onCopy(password);
+    }
   };
 
   // Handle select button click
   const handleSelect = () => {
-    if (onSelect) {
+    if (onSelect && password) {
       onSelect(password);
     }
   };
 
+  // Generate password on component mount
+  useEffect(() => {
+    generatePasswordLocally();
+  }, []);
+
   return (
     <Card className={className}>
-      <CardHeader className="border-b border-gray-200 dark:border-gray-700">
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
+      {title && (
+        <CardHeader className="border-b border-gray-200 dark:border-gray-700">
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
+      )}
       <CardContent className="p-6">
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
@@ -127,15 +169,16 @@ const PasswordGenerator: React.FC<PasswordGeneratorProps> = ({
               id="password"
               value={password}
               readOnly
-              className="mono block w-full px-4 py-3 pr-10 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-primary focus:border-primary"
+              className="font-mono block w-full px-4 py-3 pr-10 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-primary focus:border-primary"
             />
             <Button
               variant="ghost"
               size="icon"
               className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
               onClick={handleGeneratePassword}
+              disabled={generatePasswordMutation.isPending}
             >
-              <RefreshCw className="h-5 w-5 text-gray-500" />
+              <RefreshCw className={`h-5 w-5 text-gray-500 ${generatePasswordMutation.isPending ? 'animate-spin' : ''}`} />
             </Button>
           </div>
           <div className="mt-2">
@@ -154,8 +197,8 @@ const PasswordGenerator: React.FC<PasswordGeneratorProps> = ({
               max={32}
               step={1}
               value={[length]}
-              onValueChange={(value) => setLength(value[0])}
-              className="slider w-full"
+              onValueChange={(value) => handleLengthChange(value[0])}
+              className="w-full"
             />
           </div>
 
@@ -202,12 +245,13 @@ const PasswordGenerator: React.FC<PasswordGeneratorProps> = ({
             >
               {generatePasswordMutation.isPending ? "Generating..." : "Generate Password"}
             </Button>
-            
+
             {onSelect && (
               <Button
                 variant="outline"
                 className="w-full"
                 onClick={handleSelect}
+                disabled={!password}
               >
                 Use This Password
               </Button>
