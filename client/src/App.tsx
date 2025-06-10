@@ -84,7 +84,7 @@ function Router() {
 
 function App() {
   // Check authentication status on mount
-  useEffect(() => {
+ /* useEffect(() => {
     const checkAuth = async () => {
       try {
         await queryClient.fetchQuery({ 
@@ -101,7 +101,7 @@ function App() {
     };
     
     checkAuth();
-  }, []);
+  }, []); */
 
   return (
     <QueryClientProvider client={queryClient}>

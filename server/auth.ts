@@ -1,13 +1,13 @@
-import { Request, Response, NextFunction } from 'express';
-import { comparePassword, hashPassword } from './utils';
-import { storage } from './storage';
-import session from 'express-session';
-import pgSession from 'connect-pg-simple';
-import { pool } from './db';
-import MemoryStore from 'memorystore';
+import { Request, Response, NextFunction } from "express";
+import { comparePassword, hashPassword } from "./utils";
+import { storage } from "./storage";
+import session from "express-session";
+import pgSession from "connect-pg-simple";
+import { pool } from "./db";
+import MemoryStore from "memorystore";
 
 // Extend the session interface to include our custom properties
-declare module 'express-session' {
+declare module "express-session" {
   interface Session {
     userId?: number;
   }
@@ -15,18 +15,16 @@ declare module 'express-session' {
 
 // Determine store based on environment
 const getSessionStore = () => {
-  if (process.env.NODE_ENV === 'production' && process.env.DATABASE_URL) {
-    // Use PostgreSQL in production
+  if (process.env.NODE_ENV === "production" && process.env.DATABASE_URL) {
     const PgStore = pgSession(session);
     return new PgStore({
       pool,
-      tableName: 'user_sessions',
+      tableName: "user_sessions",
     });
   } else {
-    // Use memory store in development (with memory leak fix)
     const MemoryStoreFactory = MemoryStore(session);
     return new MemoryStoreFactory({
-      checkPeriod: 86400000 // Prune expired entries every 24h
+      checkPeriod: 86400000, // Prune expired entries every 24h
     });
   }
 };
@@ -36,68 +34,67 @@ export const configureSession = (app: any) => {
   app.use(
     session({
       store: getSessionStore(),
-      secret: process.env.SESSION_SECRET || 'secure-vault-secret',
+      secret: process.env.SESSION_SECRET || "secure-vault-secret",
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NODE_ENV === "production",
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
       },
-    })
+    }),
   );
 };
 
 // Authentication middleware
-export const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
+export const isAuthenticated = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   if (req.session && req.session.userId !== undefined) {
     return next();
   }
-  
-  res.status(401).json({ message: 'Unauthorized' });
+
+  return res.status(401).json({ message: "Unauthorized" });
 };
 
 // Login handler
 export const login = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
-    
+
     const user = await storage.getUserByUsername(username);
     if (!user) {
-      return res.status(401).json({ message: 'Invalid username or password' });
+      return res.status(401).json({ message: "Invalid username or password" });
     }
-    
-    const isPasswordValid = await comparePassword(password, user.password);
+
+    const isPasswordValid = await comparePassword(password, user.password_hash);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid username or password' });
+      return res.status(401).json({ message: "Invalid username or password" });
     }
-    
-    // Update last login
+
     await storage.updateUserLastLogin(user.id);
-    
-    // Log activity
+
     await storage.createActivityLog({
       userId: user.id,
-      action: 'login',
-      details: 'User logged in successfully',
-      ipAddress: req.ip || '',
-      userAgent: req.headers['user-agent'] || '',
+      action: "login",
+      details: "User logged in successfully",
+      ipAddress: req.ip || "",
+      userAgent: req.headers["user-agent"] || "",
     });
-    
-    // Set session
+
     req.session.userId = user.id;
-    
-    // Don't return sensitive data
-    const { password: _, masterKeyHash: __, salt: ___, ...safeUser } = user;
-    
-    res.json({ 
+
+    const { password_hash: _, salt: __, ...safeUser } = user;
+
+    return res.json({
       user: safeUser,
-      message: 'Login successful' 
+      message: "Login successful",
     });
-    
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'An error occurred during login' });
+    console.error("Login error:", error);
+    return res.status(500).json({ message: "An error occurred during login" });
   }
 };
 
@@ -105,61 +102,52 @@ export const login = async (req: Request, res: Response) => {
 export const register = async (req: Request, res: Response) => {
   try {
     const { username, password, email, name, confirmPassword } = req.body;
-    
-    // Check if user already exists
+
     const existingUser = await storage.getUserByUsername(username);
     if (existingUser) {
-      return res.status(400).json({ message: 'Username already exists' });
+      return res.status(400).json({ message: "Registration failed. Please try a different username or email." });
     }
-    
-    // Check if email already exists
-    const existingEmail = await storage.getUserByUsername(email);
+
+    const existingEmail = await storage.getUserByEmail(email);
     if (existingEmail) {
-      return res.status(400).json({ message: 'Email already in use' });
+      return res.status(400).json({ message: "Registration failed. Please try a different username or email." });
     }
-    
-    // Password match check
+
     if (password !== confirmPassword) {
-      return res.status(400).json({ message: 'Passwords do not match' });
+      return res.status(400).json({ message: "Passwords do not match" });
     }
-    
-    // Hash password
+
     const { hash, salt } = await hashPassword(password);
-    
-    // Create user
+
     const user = await storage.createUser({
       username,
-      password: hash,
+      password_hash: hash,
       email,
       name,
-      masterKeyHash: hash, // Using same hash for simplicity
       salt,
-      confirmPassword,
     });
-    
-    // Log activity
+
     await storage.createActivityLog({
       userId: user.id,
-      action: 'register',
-      details: 'User registered successfully',
-      ipAddress: req.ip || '',
-      userAgent: req.headers['user-agent'] || '',
+      action: "register",
+      details: "User registered successfully",
+      ipAddress: req.ip || "",
+      userAgent: req.headers["user-agent"] || "",
     });
-    
-    // Set session
+
     req.session.userId = user.id;
-    
-    // Don't return sensitive data
-    const { password: _, masterKeyHash: __, salt: ___, ...safeUser } = user;
-    
-    res.status(201).json({ 
+
+    const { password_hash: _, salt: __, ...safeUser } = user;
+
+    return res.status(201).json({
       user: safeUser,
-      message: 'Registration successful' 
+      message: "Registration successful",
     });
-    
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ message: 'An error occurred during registration' });
+    console.error("Registration error:", error);
+    return res
+      .status(500)
+      .json({ message: "An error occurred during registration" });
   }
 };
 
@@ -168,13 +156,13 @@ export const logout = (req: Request, res: Response) => {
   if (req.session) {
     req.session.destroy((err) => {
       if (err) {
-        return res.status(500).json({ message: 'Logout failed' });
+        return res.status(500).json({ message: "Logout failed" });
       }
-      res.clearCookie('connect.sid');
-      res.json({ message: 'Logged out successfully' });
+      res.clearCookie("connect.sid");
+      return res.json({ message: "Logged out successfully" });
     });
   } else {
-    res.json({ message: 'No active session' });
+    return res.json({ message: "No active session" });
   }
 };
 
@@ -182,21 +170,19 @@ export const logout = (req: Request, res: Response) => {
 export const getCurrentUser = async (req: Request, res: Response) => {
   try {
     if (!req.session.userId) {
-      return res.status(401).json({ message: 'Not authenticated' });
+      return res.status(401).json({ message: "Not authenticated" });
     }
-    
+
     const user = await storage.getUser(req.session.userId);
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
-    
-    // Don't return sensitive data
-    const { password: _, masterKeyHash: __, salt: ___, ...safeUser } = user;
-    
-    res.json({ user: safeUser });
-    
+
+    const { password_hash: _, salt: __, ...safeUser } = user;
+
+    return res.json({ user: safeUser });
   } catch (error) {
-    console.error('Get current user error:', error);
-    res.status(500).json({ message: 'An error occurred' });
+    console.error("Get current user error:", error);
+    return res.status(500).json({ message: "An error occurred" });
   }
 };

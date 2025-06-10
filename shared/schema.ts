@@ -1,11 +1,19 @@
-import { pgTable, text, serial, integer, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  serial,
+  integer,
+  timestamp,
+  boolean,
+  jsonb,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  password_hash: text("password_hash").notNull(),
   email: text("email").notNull().unique(),
   name: text("name"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -17,7 +25,9 @@ export const users = pgTable("users", {
 
 export const passwords = pgTable("passwords", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
   title: text("title").notNull(),
   username: text("username"),
   encryptedPassword: text("encrypted_password").notNull(),
@@ -32,7 +42,9 @@ export const passwords = pgTable("passwords", {
 
 export const securityAlerts = pgTable("security_alerts", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
   type: text("type").notNull(), // 'breach', 'weak', 'reused'
   description: text("description").notNull(),
   metadata: jsonb("metadata"),
@@ -43,11 +55,13 @@ export const securityAlerts = pgTable("security_alerts", {
 
 export const activityLogs = pgTable("activity_logs", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
   action: text("action").notNull(), // 'create', 'update', 'delete', 'login', etc.
   details: text("details"),
-  ipAddress: text("ip_address").notNull().default(''),
-  userAgent: text("user_agent").notNull().default(''),
+  ipAddress: text("ip_address").notNull().default(""),
+  userAgent: text("user_agent").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -68,11 +82,11 @@ export const loginUserSchema = z.object({
 });
 
 export const insertPasswordSchema = createInsertSchema(passwords).omit({
-  id: true, 
-  userId: true, 
-  createdAt: true, 
+  id: true,
+  userId: true,
+  createdAt: true,
   updatedAt: true,
-  strength: true
+  strength: true,
 });
 
 export const updatePasswordSchema = insertPasswordSchema.partial();

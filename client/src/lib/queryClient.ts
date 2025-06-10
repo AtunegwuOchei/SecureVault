@@ -12,14 +12,32 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  // Optional base URL (e.g., from environment variables)
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+  const fullUrl = url.startsWith("http") ? url : `${baseUrl}${url}`;
+
+  console.log("📡 API Request →", {
+    method,
+    url: fullUrl,
+    payload: data,
+  });
+
+  const res = await fetch(fullUrl, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
 
-  await throwIfResNotOk(res);
+  if (!res.ok) {
+    const text = (await res.text()) || res.statusText;
+    console.error("❌ API Error Response →", {
+      status: res.status,
+      body: text,
+    });
+    throw new Error(`${res.status}: ${text}`);
+  }
+
   return res;
 }
 
