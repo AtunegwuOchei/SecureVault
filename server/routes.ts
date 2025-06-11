@@ -21,7 +21,6 @@ import {
   loginUserSchema,
   insertUserSchema,
   passwordGeneratorSchema,
-  contactMessageSchema,
   type PasswordGenerator,
 } from "@shared/schema";
 
@@ -456,68 +455,6 @@ app.get("/api/health", (req: Request, res: Response) => {
       } catch (error) {
         console.error("Generate password error:", error);
         return handleServerError(res, "Failed to generate password");
-      }
-    }
-  );
-
-  // ----- CONTACT MESSAGES -----
-  app.post(
-    "/api/contact",
-    async (req: Request, res: Response) => {
-      try {
-        const result = contactMessageSchema.safeParse(req.body);
-        if (!result.success) {
-          return res.status(400).json({
-            message: result.error.errors[0].message,
-          });
-        }
-
-        // Get user ID if authenticated (optional)
-        const userId = req.session?.userId;
-
-        const contactMessage = await storage.createContactMessage({
-          ...result.data,
-          userId,
-          ipAddress: (req.headers["x-forwarded-for"] || req.ip) as string || "",
-          userAgent: req.headers["user-agent"] || "",
-        });
-
-        // Log activity if user is authenticated
-        if (userId) {
-          await storage.createActivityLog({
-            userId,
-            action: "contact_message",
-            details: `Sent contact message: ${result.data.subject}`,
-            ipAddress: (req.headers["x-forwarded-for"] || req.ip) as string || "",
-            userAgent: req.headers["user-agent"] || "",
-          });
-        }
-
-        res.status(201).json({ 
-          message: "Contact message sent successfully",
-          id: contactMessage.id
-        });
-      } catch (error) {
-        console.error("Contact message error:", error);
-        return handleServerError(res, "Failed to send contact message");
-      }
-    }
-  );
-
-  // Get contact messages (admin only - for now just return user's own messages)
-  app.get(
-    "/api/contact-messages",
-    isAuthenticated,
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const userId = req.session.userId;
-        if (!userId) return res.status(401).json({ message: "Unauthorized" });
-
-        const messages = await storage.getContactMessagesByUserId(userId);
-        res.json(messages);
-      } catch (error) {
-        console.error("Get contact messages error:", error);
-        return handleServerError(res, "Failed to retrieve contact messages");
       }
     }
   );

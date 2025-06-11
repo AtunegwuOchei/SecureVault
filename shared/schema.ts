@@ -65,20 +65,6 @@ export const activityLogs = pgTable("activity_logs", {
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const contactMessages = pgTable("contact_messages", {
-	id: serial("id").primaryKey(),
-	userId: integer("user_id").references(() => users.id), // Optional - user might not be logged in
-	name: text("name").notNull(),
-	email: text("email").notNull(),
-	subject: text("subject").notNull(),
-	message: text("message").notNull(),
-	status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'resolved'
-	ipAddress: text("ip_address").notNull().default(""),
-	userAgent: text("user_agent").notNull().default(""),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
-	updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
 // Schema validations
 export const insertUserSchema = z
 	.object({
@@ -120,13 +106,6 @@ export const passwordGeneratorSchema = z.object({
 	includeSymbols: z.boolean().default(true),
 });
 
-export const contactMessageSchema = z.object({
-	name: z.string().min(1, "Name is required").max(100),
-	email: z.string().email("Invalid email format"),
-	subject: z.string().min(1, "Subject is required").max(200),
-	message: z.string().min(10, "Message must be at least 10 characters").max(2000),
-});
-
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -138,7 +117,5 @@ export type UpdatePassword = z.infer<typeof updatePasswordSchema>;
 
 export type SecurityAlert = typeof securityAlerts.$inferSelect;
 export type ActivityLog = typeof activityLogs.$inferSelect;
-export type ContactMessage = typeof contactMessages.$inferSelect;
-export type InsertContactMessage = z.infer<typeof contactMessageSchema>;
 
 export type PasswordGenerator = z.infer<typeof passwordGeneratorSchema>;
