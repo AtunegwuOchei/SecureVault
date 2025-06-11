@@ -426,6 +426,73 @@ app.get("/api/health", (req: Request, res: Response) => {
   });
 });
 
+  // ----- BROWSER EXTENSION ENDPOINTS -----
+  
+  // Extension authentication endpoint
+  app.post("/api/extension/auth", async (req: Request, res: Response) => {
+    try {
+      const { extensionId, userId } = req.body;
+      
+      // Verify user is authenticated
+      if (!req.session.userId || req.session.userId !== parseInt(userId)) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      
+      // Generate extension token (store this in your database in production)
+      const extensionToken = `ext_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // In production, store this mapping: extensionToken -> userId
+      // For now, we'll just return it
+      
+      res.json({ 
+        extensionToken,
+        apiEndpoint: `${req.protocol}://${req.get('host')}/api`
+      });
+    } catch (error) {
+      console.error("Extension auth error:", error);
+      return handleServerError(res, "Failed to authenticate extension");
+    }
+  });
+  
+  // Extension password access (for autofill)
+  app.get("/api/extension/passwords", async (req: Request, res: Response) => {
+    try {
+      const extensionToken = req.headers['x-extension-token'] as string;
+      const domain = req.query.domain as string;
+      
+      if (!extensionToken) {
+        return res.status(401).json({ message: "Extension token required" });
+      }
+      
+      // In production, verify extensionToken and get userId
+      // For demo, we'll use session if available
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Session expired" });
+      }
+      
+      const passwords = await storage.getPasswordsByUserId(req.session.userId);
+      
+      // Filter passwords by domain if provided
+      const filteredPasswords = domain 
+        ? passwords.filter(p => p.website?.includes(domain))
+        : passwords;
+      
+      // Return only necessary fields for extension
+      const extensionPasswords = filteredPasswords.map(p => ({
+        id: p.id,
+        title: p.title,
+        website: p.website,
+        username: p.username,
+        // Don't send encrypted password - extension should request it separately
+      }));
+      
+      res.json(extensionPasswords);
+    } catch (error) {
+      console.error("Extension get passwords error:", error);
+      return handleServerError(res, "Failed to get passwords for extension");
+    }
+  });
+
   // ----- PASSWORD GENERATOR -----
   app.post(
     "/api/generate-password",
