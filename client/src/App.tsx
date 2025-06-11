@@ -17,6 +17,9 @@ import DeviceIntegration from "@/pages/DeviceIntegration";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import BreachAlerts from "@/pages/BreachAlerts";
+import PasswordHealth from "@/pages/PasswordHealth";
+import SyncSettings from "@/pages/SyncSettings";
+import HelpSupport from "@/pages/HelpSupport";
 
 function Router() {
   const [location] = useLocation();
@@ -65,6 +68,30 @@ function Router() {
         {isAuthPage ? null : (
           <MainLayout>
             <BreachAlerts />
+          </MainLayout>
+        )}
+      </Route>
+
+      <Route path="/password-health">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <PasswordHealth />
+          </MainLayout>
+        )}
+      </Route>
+
+      <Route path="/sync">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <SyncSettings />
+          </MainLayout>
+        )}
+      </Route>
+
+      <Route path="/help">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <HelpSupport />
           </MainLayout>
         )}
       </Route>
