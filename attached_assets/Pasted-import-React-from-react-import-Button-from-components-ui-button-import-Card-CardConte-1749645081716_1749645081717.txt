@@ -13,9 +13,77 @@ const BrowserExtension: React.FC<BrowserExtensionProps> = ({ onConnect }) => {
   const handleConnectExtension = () => {
     // Listen for messages from the browser extension
     const handleExtensionMessage = (event: MessageEvent) => {
-      // Verify origin is your extension Repl - replace with your actual extension Repl URL
-      if (event.origin !== 'https://6f84aed6-d40a-4aab-8341-06a994d1b022-00-2qwj62h3vdsa0.spock.replit.dev') return;
+      // Verify origin is your extension Repl
+      if (event.origin !== 'import React from 'react';
+          import { toast } from 'react-toastify';
 
+          interface BrowserExtensionProps {
+            onConnect?: () => void;
+          }
+
+          const BrowserExtension: React.FC<BrowserExtensionProps> = ({ onConnect }) => {
+            const handleConnectExtension = () => {
+              // Listen for messages from the browser extension
+              const handleExtensionMessage = (event: MessageEvent) => {
+                // Verify origin is your extension Repl - replace with your actual extension Repl URL
+                if (event.origin !== 'https://6f84aed6-d40a-4aab-8341-06a994d1b022-00-2qwj62h3vdsa0.spock.replit.dev') return;
+
+                if (event.data.type === 'EXTENSION_CONNECT_REQUEST') {
+                  // Send authentication token or user ID to extension
+                  event.source?.postMessage({
+                    userId: localStorage.getItem('userId'), // or get from your auth system
+                    apiEndpoint: window.location.origin + '/api'
+                  }, event.origin);
+
+                  toast({
+                    title: "Extension connected",
+                    description: "SecureVault browser extension is now linked to your account"
+                  });
+
+                  if (onConnect) {
+                    onConnect();
+                  }
+                }
+              };
+
+              window.addEventListener('message', handleExtensionMessage);
+
+              // Open extension connection window
+              const extensionWindow = window.open(
+                'https://6f84aed6-d40a-4aab-8341-06a994d1b022-00-2qwj62h3vdsa0.spock.replit.dev/connect', 
+                'extension-connect',
+                'width=500,height=600'
+              );
+
+              // Clean up listener when window closes
+              const checkClosed = setInterval(() => {
+                if (extensionWindow?.closed) {
+                  window.removeEventListener('message', handleExtensionMessage);
+                  clearInterval(checkClosed);
+                }
+              }, 1000);
+            };
+
+            const handleInstallExtension = () => {
+              // Open your actual browser extension Repl
+              window.open('https://6f84aed6-d40a-4aab-8341-06a994d1b022-00-2qwj62h3vdsa0.spock.replit.dev', '_blank');
+
+              toast({
+                title: "Extension installation",
+                description: "Opening SecureVault browser extension installer"
+              });
+            };
+
+            return (
+              <div>
+                <button onClick={handleConnectExtension}>Connect Extension</button>
+                <button onClick={handleInstallExtension}>Install Extension</button>
+              </div>
+            );
+          };
+
+          export default BrowserExtension;') return;
+      
       if (event.data.type === 'EXTENSION_CONNECT_REQUEST') {
         // Send authentication token or user ID to extension
         event.source?.postMessage({
@@ -23,12 +91,12 @@ const BrowserExtension: React.FC<BrowserExtensionProps> = ({ onConnect }) => {
           userId: localStorage.getItem('userId'), // or get from your auth system
           apiEndpoint: window.location.origin + '/api'
         }, event.origin);
-
+        
         toast({
           title: "Extension connected",
           description: "SecureVault browser extension is now linked to your account"
         });
-
+        
         if (onConnect) {
           onConnect();
         }
@@ -36,14 +104,14 @@ const BrowserExtension: React.FC<BrowserExtensionProps> = ({ onConnect }) => {
     };
 
     window.addEventListener('message', handleExtensionMessage);
-
+    
     // Open extension connection window
     const extensionWindow = window.open(
-      'https://6f84aed6-d40a-4aab-8341-06a994d1b022-00-2qwj62h3vdsa0.spock.replit.dev/connect', 
+      'https://your-extension-repl-url.replit.dev/connect', 
       'extension-connect',
       'width=500,height=600'
     );
-
+    
     // Clean up listener when window closes
     const checkClosed = setInterval(() => {
       if (extensionWindow?.closed) {
@@ -55,8 +123,9 @@ const BrowserExtension: React.FC<BrowserExtensionProps> = ({ onConnect }) => {
 
   const handleInstallExtension = () => {
     // Open your actual browser extension Repl
+    // Replace 'your-extension-repl-url' with your actual extension Repl URL
     window.open('https://6f84aed6-d40a-4aab-8341-06a994d1b022-00-2qwj62h3vdsa0.spock.replit.dev/', '_blank');
-
+    
     toast({
       title: "Extension installation",
       description: "Opening SecureVault browser extension installer"
