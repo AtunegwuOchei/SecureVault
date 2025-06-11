@@ -16,6 +16,7 @@ import Settings from "@/pages/Settings";
 import DeviceIntegration from "@/pages/DeviceIntegration";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
+import BreachAlerts from "@/pages/BreachAlerts";
 
 function Router() {
   const [location] = useLocation();
@@ -56,6 +57,14 @@ function Router() {
         {isAuthPage ? null : (
           <MainLayout>
             <SecurityDashboard />
+          </MainLayout>
+        )}
+      </Route>
+
+      <Route path="/breach-alerts">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <BreachAlerts />
           </MainLayout>
         )}
       </Route>

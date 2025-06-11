@@ -117,7 +117,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, isMobile, onClose, user })
             </button>
           )}
         </div>
-        
+
         <nav className="flex-1 px-2 py-4">
           {menuItems.map((category, categoryIndex) => (
             <div key={categoryIndex} className="mb-4">
@@ -146,7 +146,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, isMobile, onClose, user })
             </div>
           ))}
         </nav>
-        
+
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center">
             <Avatar className="h-10 w-10 bg-primary text-white">
