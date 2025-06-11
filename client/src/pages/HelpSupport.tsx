@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
+import UserGuide from "@/components/help/UserGuide";
+import SecurityBestPractices from "@/components/help/SecurityBestPractices";
 import { 
   HelpCircle, 
   MessageCircle, 
@@ -183,8 +185,10 @@ const HelpSupport: React.FC = () => {
       </div>
 
       <Tabs defaultValue="faq" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="faq">FAQ</TabsTrigger>
+          <TabsTrigger value="guide">User Guide</TabsTrigger>
+          <TabsTrigger value="security">Security Guide</TabsTrigger>
           <TabsTrigger value="resources">Resources</TabsTrigger>
           <TabsTrigger value="contact">Contact</TabsTrigger>
         </TabsList>
@@ -232,6 +236,14 @@ const HelpSupport: React.FC = () => {
               </Card>
             ))}
           </div>
+        </TabsContent>
+
+        <TabsContent value="guide">
+          <UserGuide />
+        </TabsContent>
+
+        <TabsContent value="security">
+          <SecurityBestPractices />
         </TabsContent>
 
         <TabsContent value="resources">
