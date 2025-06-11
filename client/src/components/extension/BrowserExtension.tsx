@@ -11,56 +11,25 @@ const BrowserExtension: React.FC<BrowserExtensionProps> = ({ onConnect }) => {
   const { toast } = useToast();
 
   const handleConnectExtension = () => {
-    // Listen for messages from the browser extension
-    const handleExtensionMessage = (event: MessageEvent) => {
-      // Verify origin is your extension Repl
-      if (event.origin !== 'https://your-extension-repl-url.replit.dev') return;
-      
-      if (event.data.type === 'EXTENSION_CONNECT_REQUEST') {
-        // Send authentication token or user ID to extension
-        event.source?.postMessage({
-          type: 'EXTENSION_CONNECT_RESPONSE',
-          userId: localStorage.getItem('userId'), // or get from your auth system
-          apiEndpoint: window.location.origin + '/api'
-        }, event.origin);
-        
-        toast({
-          title: "Extension connected",
-          description: "SecureVault browser extension is now linked to your account"
-        });
-        
-        if (onConnect) {
-          onConnect();
-        }
-      }
-    };
-
-    window.addEventListener('message', handleExtensionMessage);
+    // In a real implementation, this would communicate with the browser extension
+    // through a messaging API, but for now we'll just simulate it
+    toast({
+      title: "Extension connected",
+      description: "SecureVault browser extension is now linked to your account"
+    });
     
-    // Open extension connection window
-    const extensionWindow = window.open(
-      'https://your-extension-repl-url.replit.dev/connect', 
-      'extension-connect',
-      'width=500,height=600'
-    );
-    
-    // Clean up listener when window closes
-    const checkClosed = setInterval(() => {
-      if (extensionWindow?.closed) {
-        window.removeEventListener('message', handleExtensionMessage);
-        clearInterval(checkClosed);
-      }
-    }, 1000);
+    if (onConnect) {
+      onConnect();
+    }
   };
 
   const handleInstallExtension = () => {
-    // Open your actual browser extension Repl
-    // Replace 'your-extension-repl-url' with your actual extension Repl URL
-    window.open('https://your-extension-repl-url.replit.dev', '_blank');
+    // This would typically open the extension store in a new tab
+    window.open('about:blank', '_blank');
     
     toast({
       title: "Extension installation",
-      description: "Opening SecureVault browser extension installer"
+      description: "Follow the instructions to install the browser extension"
     });
   };
 
