@@ -159,7 +159,7 @@ const HelpSupport: React.FC = () => {
       method: "Phone Support",
       description: "Speak directly with our technical team",
       icon: <Phone className="h-5 w-5" />,
-      contact: "+1 (555) 123-4567",
+      contact: "+234 90-5795-9280",
       badge: "Premium"
     }
   ];
