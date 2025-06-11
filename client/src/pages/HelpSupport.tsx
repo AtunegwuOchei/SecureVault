@@ -31,6 +31,7 @@ import {
 const HelpSupport: React.FC = () => {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("faq");
   const [contactForm, setContactForm] = useState({
     name: "",
     email: "",
@@ -43,6 +44,10 @@ const HelpSupport: React.FC = () => {
       title: "Feature coming soon",
       description: "This feature is not yet implemented.",
     });
+  };
+
+  const navigateToTab = (tabName: string) => {
+    setActiveTab(tabName);
   };
 
   const handleContactSubmit = (e: React.FormEvent) => {
@@ -124,7 +129,7 @@ const HelpSupport: React.FC = () => {
       description: "Comprehensive documentation and best practices",
       icon: <BookOpen className="h-6 w-6 text-green-500" />,
       action: "Read Guide",
-      onClick: showNotImplementedToast
+      onClick: () => navigateToTab("guide")
     },
     {
       title: "Community Forum",
@@ -138,7 +143,7 @@ const HelpSupport: React.FC = () => {
       description: "Learn how to stay secure online",
       icon: <Shield className="h-6 w-6 text-orange-500" />,
       action: "Learn More",
-      onClick: showNotImplementedToast
+      onClick: () => navigateToTab("security")
     }
   ];
 
@@ -184,7 +189,7 @@ const HelpSupport: React.FC = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="faq" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="faq">FAQ</TabsTrigger>
           <TabsTrigger value="guide">User Guide</TabsTrigger>
