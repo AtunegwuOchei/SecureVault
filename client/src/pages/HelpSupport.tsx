@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   HelpCircle, 
   MessageCircle, 
@@ -43,13 +45,31 @@ const HelpSupport: React.FC = () => {
     });
   };
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  // Contact form submission mutation
+  const contactMutation = useMutation({
+    mutationFn: async (data: typeof contactForm) => {
+      const response = await apiRequest("POST", "/api/contact", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Message sent",
+        description: "Thank you for contacting us. We'll get back to you soon.",
+      });
+      setContactForm({ name: "", email: "", subject: "", message: "" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to send message",
+        description: error.message || "Please try again later.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Message sent",
-      description: "Thank you for contacting us. We'll get back to you soon.",
-    });
-    setContactForm({ name: "", email: "", subject: "", message: "" });
+    await contactMutation.mutateAsync(contactForm);
   };
 
   const faqItems = [
@@ -344,8 +364,12 @@ const HelpSupport: React.FC = () => {
                     />
                   </div>
                   
-                  <Button type="submit" className="w-full">
-                    Send Message
+                  <Button 
+                    type="submit" 
+                    className="w-full"
+                    disabled={contactMutation.isPending}
+                  >
+                    {contactMutation.isPending ? "Sending..." : "Send Message"}
                   </Button>
                 </form>
               </CardContent>

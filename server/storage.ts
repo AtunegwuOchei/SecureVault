@@ -5,13 +5,15 @@ import {
   passwords,
   securityAlerts,
   activityLogs,
+  contactMessages,
   type User,
-  type InsertUser,
   type Password,
   type InsertPassword,
   type UpdatePassword,
   type SecurityAlert,
-  type ActivityLog
+  type ActivityLog,
+  type ContactMessage,
+  type InsertContactMessage,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -46,6 +48,16 @@ export interface IStorage {
     weak: number;
     reused: number;
   }>;
+
+    // Contact Messages
+  createContactMessage(data: InsertContactMessage & {
+    userId?: number;
+    ipAddress: string;
+    userAgent: string;
+  }): Promise<ContactMessage>;
+  getContactMessages(limit?: number): Promise<ContactMessage[]>;
+  getContactMessagesByUserId(userId: number): Promise<ContactMessage[]>;
+  updateContactMessageStatus(id: number, status: string): Promise<ContactMessage | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -214,6 +226,49 @@ export class DatabaseStorage implements IStorage {
     const reused = Array.from(passwordMap.values()).filter(count => count > 1).length;
 
     return { total, strong, weak, reused };
+  }
+
+    // Contact Messages
+  async createContactMessage(data: InsertContactMessage & {
+    userId?: number;
+    ipAddress: string;
+    userAgent: string;
+  }): Promise<ContactMessage> {
+    const [result] = await db
+      .insert(contactMessages)
+      .values(data)
+      .returning();
+
+    return result;
+  }
+
+  async getContactMessages(limit: number = 50): Promise<ContactMessage[]> {
+    return db
+      .select()
+      .from(contactMessages)
+      .orderBy(desc(contactMessages.createdAt))
+      .limit(limit);
+  }
+
+  async getContactMessagesByUserId(userId: number): Promise<ContactMessage[]> {
+    return db
+      .select()
+      .from(contactMessages)
+      .where(eq(contactMessages.userId, userId))
+      .orderBy(desc(contactMessages.createdAt));
+  }
+
+  async updateContactMessageStatus(id: number, status: string): Promise<ContactMessage | null> {
+    const [result] = await db
+      .update(contactMessages)
+      .set({ 
+        status,
+        updatedAt: new Date()
+      })
+      .where(eq(contactMessages.id, id))
+      .returning();
+
+    return result || null;
   }
 }
 
