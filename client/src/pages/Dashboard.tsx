@@ -1,24 +1,26 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Lock, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Lock, ShieldCheck, AlertTriangle, LogOut } from "lucide-react";
 import StatsCard from "@/components/dashboard/StatsCard";
 import RecentActivity from "@/components/dashboard/RecentActivity";
 import PasswordHealth from "@/components/dashboard/PasswordHealth";
 import SecurityTips from "@/components/security/SecurityTips";
 import PremiumFeatures from "@/components/security/PremiumFeatures";
 import PasswordGenerator from "@/components/common/PasswordGenerator";
+import { Button } from "@/components/ui/button";
+import { useSession, signOut } from "next-auth/react";
 
 const Dashboard: React.FC = () => {
   // Fetch current user
   const { data: userData, isLoading: userLoading } = useQuery({
     queryKey: ['/api/auth/me'],
   });
-  
+
   // Fetch password stats
   const { data: passwordStats, isLoading: statsLoading } = useQuery({
     queryKey: ['/api/password-stats'],
   });
-  
+
   // Fetch security alerts
   const { data: securityAlerts, isLoading: alertsLoading } = useQuery({
     queryKey: ['/api/security-alerts'],
@@ -26,29 +28,43 @@ const Dashboard: React.FC = () => {
 
   // Get user's first name
   const firstName = userData?.user?.name?.split(' ')[0] || userData?.user?.username || 'there';
-  
+
   // Count unresolved alerts
   const unresolvedAlerts = securityAlerts?.filter((alert: any) => !alert.isResolved)?.length || 0;
-  
+
   // Get password health percentage
   const passwordHealthPercentage = passwordStats ? 
     Math.max(0, Math.min(100, Math.round(
       (passwordStats.strong / Math.max(1, passwordStats.total)) * 100
     ))) : 0;
 
+    const handleLogout = async () => {
+      await signOut();
+    };
+
   return (
     <div>
       {/* Welcome Section */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Welcome back, {firstName}!</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">
+      <div className="mb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Welcome back, {firstName}!</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
           {unresolvedAlerts > 0 
             ? `Your password security needs attention. You have ${unresolvedAlerts} item${unresolvedAlerts !== 1 ? 's' : ''} that need${unresolvedAlerts === 1 ? 's' : ''} attention.`
             : "Your password security is in good shape. No issues detected."
           }
-        </p>
+          </p>
+        </div>
+        <Button 
+          variant="outline" 
+          onClick={handleLogout}
+          className="flex items-center gap-2"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign Out
+        </Button>
       </div>
-      
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <StatsCard
@@ -59,7 +75,7 @@ const Dashboard: React.FC = () => {
           iconColor="text-primary"
           subText={statsLoading ? "" : `${passwordStats?.total - passwordStats?.strong || 0} need attention`}
         />
-        
+
         <StatsCard
           title="Password Health"
           value={statsLoading ? "..." : passwordHealthPercentage}
@@ -70,7 +86,7 @@ const Dashboard: React.FC = () => {
           progressColor="bg-secondary-500"
           subText={statsLoading ? "" : `${passwordStats?.weak || 0} weak passwords`}
         />
-        
+
         <StatsCard
           title="Security Alerts"
           value={alertsLoading ? "..." : unresolvedAlerts}
@@ -85,18 +101,18 @@ const Dashboard: React.FC = () => {
           }
         />
       </div>
-      
+
       {/* Recent Activity and Password Generator */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         <RecentActivity />
         <PasswordGenerator title="Quick Password Generator" />
       </div>
-      
+
       {/* Password Health Section */}
       <div className="mb-8">
         <PasswordHealth />
       </div>
-      
+
       {/* Bottom Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <PremiumFeatures />

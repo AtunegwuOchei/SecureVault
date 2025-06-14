@@ -26,6 +26,10 @@ import {
   passwordGeneratorSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  createTeamSchema,
+  sharePasswordSchema,
+  createSharedVaultSchema,
+  emergencyAccessSchema,
   type PasswordGenerator,
 } from "@shared/schema";
 

@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
-import { X, Home, Lock, Key, Shield, Bell, Settings, Clock, Info, Smartphone, Globe } from "lucide-react";
+import { X, Home, Lock, Key, Shield, Bell, Settings, Clock, Info, Smartphone, Globe, Crown, LogOut } from "lucide-react";
 
 interface SidebarProps {
   isVisible: boolean;
@@ -11,6 +11,15 @@ interface SidebarProps {
   onClose: () => void;
   user: any;
 }
+
+const handleLogout = async () => {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  } catch (error) {
+    console.error('Logout failed:', error);
+  }
+};
 
 const Sidebar: React.FC<SidebarProps> = ({ isVisible, isMobile, onClose, user }) => {
   const [location] = useLocation();
@@ -78,6 +87,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, isMobile, onClose, user })
           label: "Help & Support",
           icon: <Info className="h-5 w-5 mr-3" />,
           path: "/help"
+        }
+      ]
+    },
+    {
+      category: "Enterprise",
+      items: [
+        {
+          label: "Enterprise Features",
+          icon: <Crown className="h-5 w-5 mr-3" />,
+          path: "/enterprise"
         }
       ]
     }
@@ -148,19 +167,28 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, isMobile, onClose, user })
         </nav>
 
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center">
-            <Avatar className="h-10 w-10 bg-primary text-white">
-              <AvatarFallback>{user ? getInitials(user.name || user.username) : 'U'}</AvatarFallback>
-            </Avatar>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {user ? (user.name || user.username) : 'User'}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {user?.isPremium ? 'Premium Account' : 'Free Account'}
-              </p>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center">
+              <Avatar className="h-10 w-10 bg-primary text-white">
+                <AvatarFallback>{user ? getInitials(user.name || user.username) : 'U'}</AvatarFallback>
+              </Avatar>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {user ? (user.name || user.username) : 'User'}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {user?.isPremium ? 'Premium Account' : 'Free Account'}
+                </p>
+              </div>
             </div>
           </div>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <LogOut className="h-4 w-4 mr-3" />
+            Sign Out
+          </button>
         </div>
       </div>
     </aside>

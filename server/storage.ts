@@ -6,6 +6,13 @@ import {
   securityAlerts,
   activityLogs,
   passwordResetTokens,
+	teams,
+	teamMembers,
+	sharedPasswords,
+	sharedVaults,
+	sharedVaultMembers,
+	sharedVaultPasswords,
+	emergencyAccess,
   type User,
   type InsertUser,
   type Password,
@@ -13,13 +20,6 @@ import {
   type UpdatePassword,
   type SecurityAlert,
   type ActivityLog,
-	teams,
-	teamMembers,
-	sharedPasswords,
-	sharedVaults,
-	sharedVaultMembers,
-	sharedVaultPasswords,
-	emergencyAccess
 } from "@shared/schema";
 
 export interface IStorage {
@@ -68,6 +68,44 @@ export interface IStorage {
     weak: number;
     reused: number;
   }>;
+
+	// Team methods
+	createTeam(data: { name: string; description?: string; ownerId: number }): Promise<any>;
+	getTeamsByUserId(userId: number): Promise<any>;
+	getTeamMembers(teamId: number): Promise<any>;
+
+	// Password sharing methods
+	sharePassword(data: {
+		passwordId: number;
+		sharedByUserId: number;
+		sharedWithUserId?: number;
+		teamId?: number;
+		permissions: string;
+		expiresAt?: Date;
+	}): Promise<any>;
+	getSharedPasswordsForUser(userId: number): Promise<any>;
+	getSharedPasswordsByOwner(userId: number): Promise<any>;
+
+	// Shared vault methods
+	createSharedVault(data: {
+		name: string;
+		description?: string;
+		ownerId: number;
+		teamId?: number;
+		isPublic?: boolean;
+	}): Promise<any>;
+	getSharedVaultsForUser(userId: number): Promise<any>;
+	getVaultPasswords(vaultId: number, userId: number): Promise<any>;
+	addPasswordToVault(vaultId: number, passwordId: number, userId: number): Promise<any>;
+
+	// Emergency access methods
+	createEmergencyAccess(data: {
+		grantorId: number;
+		emergencyContactId: number;
+		accessLevel: string;
+		waitingPeriod: number;
+	}): Promise<any>;
+	getEmergencyAccessByGrantor(grantorId: number): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {

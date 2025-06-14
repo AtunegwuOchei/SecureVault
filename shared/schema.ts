@@ -220,17 +220,13 @@ export const forgotPasswordSchema = z.object({
 });
 
 export const resetPasswordSchema = z.object({
-	token: z.string().min(1, "Reset token is required"),
-	password: z.string().min(8, "Password must be at least 8 characters"),
-	confirmPassword: z.string().min(8, "Please confirm your password"),
-}).refine((data) => data.password === data.confirmPassword, {
-	message: "Passwords do not match",
-	path: ["confirmPassword"],
+  token: z.string().min(1, "Reset token is required"),
+  password: z.string().min(8, "Password must be at least 8 characters")
 });
 
 export const createTeamSchema = z.object({
-	name: z.string().min(1, "Team name is required").max(100),
-	description: z.string().optional(),
+  name: z.string().min(1, "Team name is required").max(100),
+  description: z.string().optional()
 });
 
 export const sharePasswordSchema = z.object({
@@ -244,10 +240,10 @@ export const sharePasswordSchema = z.object({
 });
 
 export const createSharedVaultSchema = z.object({
-	name: z.string().min(1, "Vault name is required").max(100),
-	description: z.string().optional(),
-	teamId: z.number().min(1).optional(),
-	isPublic: z.boolean().default(false),
+  name: z.string().min(1, "Vault name is required").max(100),
+  description: z.string().optional(),
+  teamId: z.number().min(1).optional(),
+  isPublic: z.boolean().default(false),
 });
 
 export const inviteToVaultSchema = z.object({
