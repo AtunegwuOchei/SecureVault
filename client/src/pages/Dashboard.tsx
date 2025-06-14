@@ -9,6 +9,8 @@ import PremiumFeatures from "@/components/security/PremiumFeatures";
 import PasswordGenerator from "@/components/common/PasswordGenerator";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useBiometric } from "@/hooks/use-biometric";
+import { BiometricSetup } from "@/components/auth/BiometricSetup";
 
 const Dashboard: React.FC = () => {
   // Fetch current user
@@ -44,7 +46,19 @@ const Dashboard: React.FC = () => {
       await logout();
     };
 
+  const { isSupported: biometricSupported, isEnabled: biometricEnabled } = useBiometric();
+  const [showBiometricSetup, setShowBiometricSetup] = React.useState(false);
+
+  React.useEffect(() => {
+    // Show biometric setup dialog for supported devices that haven't set it up
+    const hasSeenBiometricPrompt = localStorage.getItem('biometric_prompt_shown');
+    if (biometricSupported && !biometricEnabled && !hasSeenBiometricPrompt) {
+      setShowBiometricSetup(true);
+    }
+  }, [biometricSupported, biometricEnabled]);
+
   return (
+    <>
     <div>
       {/* Welcome Section */}
       <div className="mb-8 flex justify-between items-start">
@@ -121,6 +135,13 @@ const Dashboard: React.FC = () => {
         <SecurityTips />
       </div>
     </div>
+      {showBiometricSetup && (
+        <BiometricSetup onClose={() => {
+          setShowBiometricSetup(false);
+          localStorage.setItem('biometric_prompt_shown', 'true');
+        }} />
+      )}
+    </>
   );
 };
 

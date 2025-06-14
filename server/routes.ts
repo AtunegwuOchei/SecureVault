@@ -724,10 +724,31 @@ app.get("/api/health", (req: Request, res: Response) => {
           return res.status(400).json({ message: "Invalid password ID" });
         }
 
-        const result = sharePasswordSchema.safeParse(req.body);
-        if (!result.success) {
-          return res.status(400).json({
-            message: result.error.errors[0].message,
+        // Handle both old schema and email-based sharing
+        const { sharedWithUserEmail, sharedWithUserId, ...restData } = req.body;
+        
+        let shareData = {
+          passwordId,
+          sharedByUserId: userId,
+          ...restData,
+          expiresAt: restData.expiresAt ? new Date(restData.expiresAt) : undefined
+        };
+
+        // If email is provided, try to find the user
+        if (sharedWithUserEmail) {
+          const targetUser = await storage.getUserByEmail(sharedWithUserEmail);
+          if (targetUser) {
+            shareData.sharedWithUserId = targetUser.id;
+          } else {
+            return res.status(404).json({ 
+              message: "User with this email not found. They need to create an account first." 
+            });
+          }
+        } else if (sharedWithUserId) {
+          shareData.sharedWithUserId = sharedWithUserId;
+        } else {
+          return res.status(400).json({ 
+            message: "Either sharedWithUserEmail or sharedWithUserId is required" 
           });
         }
 
@@ -737,12 +758,7 @@ app.get("/api/health", (req: Request, res: Response) => {
           return res.status(404).json({ message: "Password not found" });
         }
 
-        const sharedPassword = await storage.sharePassword({
-          passwordId,
-          sharedByUserId: userId,
-          ...result.data,
-          expiresAt: result.data.expiresAt ? new Date(result.data.expiresAt) : undefined
-        });
+        const sharedPassword = await storage.sharePassword(shareData);
 
         res.status(201).json(sharedPassword);
       } catch (error) {

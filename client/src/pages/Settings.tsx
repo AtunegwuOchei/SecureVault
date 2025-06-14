@@ -1,42 +1,55 @@
 import React, { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useTheme } from "@/components/ui/theme-provider";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Shield, Lock, Bell, Palette, Download, Trash2, Fingerprint } from "lucide-react";
+import { useBiometric } from "@/hooks/use-biometric";
+import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import BiometricSetup from "@/components/auth/BiometricSetup";
+import { Slider } from "@/components/ui/slider";
+import { useTheme } from "@/components/ui/theme-provider";
 import { useQuery } from "@tanstack/react-query";
-import { Moon, Sun, Laptop, Fingerprint, AlertTriangle, Shield, Lock, UserCircle } from "lucide-react";
+import { Moon, Sun, Laptop, AlertTriangle, UserCircle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Settings: React.FC = () => {
-  const { theme, setTheme } = useTheme();
+  const [notifications, setNotifications] = useState(true);
+  const [autoLock, setAutoLock] = useState(true);
+  const [theme, setTheme] = useState("light");
+  const [twoFactor, setTwoFactor] = useState(false);
+  const { user } = useAuth();
   const { toast } = useToast();
-  
+  const { isSupported: biometricSupported, isEnabled: biometricEnabled, setupBiometric, disableBiometric } = useBiometric();
+  const [showBiometricSetup, setShowBiometricSetup] = useState(false);
+  const { theme: currentTheme, setTheme: setCurrentTheme } = useTheme();
+
   // Fetch user data
   const { data: userData, isLoading } = useQuery({
     queryKey: ['/api/auth/me'],
   });
-  
-  const user = userData?.user;
-  
+
+  const userDetails = userData?.user;
+
   // Settings states
   const [autoLockTimeout, setAutoLockTimeout] = useState(5);
-  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricEnabledState, setBiometricEnabledState] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [autoFillEnabled, setAutoFillEnabled] = useState(true);
-  
+
   const showNotImplementedToast = () => {
     toast({
       title: "Feature coming soon",
       description: "This feature is not yet implemented.",
     });
   };
-  
+
   const handleSaveSettings = () => {
     toast({
       title: "Settings saved",
@@ -47,7 +60,7 @@ const Settings: React.FC = () => {
   return (
     <div>
       <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Settings</h1>
-      
+
       <Tabs defaultValue="account" className="space-y-6">
         <TabsList className="grid grid-cols-4 lg:w-[600px]">
           <TabsTrigger value="account">Account</TabsTrigger>
@@ -55,7 +68,7 @@ const Settings: React.FC = () => {
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
           <TabsTrigger value="sync">Sync</TabsTrigger>
         </TabsList>
-        
+
         {/* Account Settings */}
         <TabsContent value="account">
           <Card>
@@ -68,33 +81,33 @@ const Settings: React.FC = () => {
             <CardContent className="space-y-6">
               <div className="flex items-center space-x-4">
                 <div className="h-16 w-16 rounded-full bg-primary flex items-center justify-center text-white text-2xl">
-                  {user?.name ? user.name.charAt(0).toUpperCase() : user?.username?.charAt(0).toUpperCase() || 'U'}
+                  {userDetails?.name ? userDetails.name.charAt(0).toUpperCase() : userDetails?.username?.charAt(0).toUpperCase() || 'U'}
                 </div>
                 <div>
-                  <h3 className="font-medium">{user?.name || user?.username || 'User'}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{user?.email || 'email@example.com'}</p>
+                  <h3 className="font-medium">{userDetails?.name || userDetails?.username || 'User'}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{userDetails?.email || 'email@example.com'}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {user?.isPremium ? 'Premium Account' : 'Free Account'}
+                    {userDetails?.isPremium ? 'Premium Account' : 'Free Account'}
                   </p>
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full Name</Label>
-                  <Input id="fullName" defaultValue={user?.name || ''} placeholder="Enter your full name" />
+                  <Input id="fullName" defaultValue={userDetails?.name || ''} placeholder="Enter your full name" />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
-                  <Input id="email" type="email" defaultValue={user?.email || ''} placeholder="Enter your email" />
+                  <Input id="email" type="email" defaultValue={userDetails?.email || ''} placeholder="Enter your email" />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="username">Username</Label>
-                  <Input id="username" defaultValue={user?.username || ''} placeholder="Enter your username" />
+                  <Input id="username" defaultValue={userDetails?.username || ''} placeholder="Enter your username" />
                 </div>
-                
+
                 <div className="space-y-2">
                   <h3 className="text-lg font-medium">Change Password</h3>
                   <div className="space-y-2">
@@ -110,7 +123,7 @@ const Settings: React.FC = () => {
                     <Input id="confirmPassword" type="password" placeholder="Confirm your new password" />
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <h3 className="text-lg font-medium">Account Actions</h3>
                   <div className="flex space-x-2">
@@ -119,12 +132,12 @@ const Settings: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+
               <Button onClick={handleSaveSettings}>Save Changes</Button>
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         {/* Security Settings */}
         <TabsContent value="security">
           <Card>
@@ -158,7 +171,7 @@ const Settings: React.FC = () => {
                     <span className="ml-2 text-sm w-10">{autoLockTimeout}m</span>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <div className="flex items-center">
@@ -171,11 +184,11 @@ const Settings: React.FC = () => {
                   </div>
                   <Switch
                     id="biometric"
-                    checked={biometricEnabled}
-                    onCheckedChange={setBiometricEnabled}
+                    checked={biometricEnabledState}
+                    onCheckedChange={setBiometricEnabledState}
                   />
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <div className="flex items-center">
@@ -192,7 +205,7 @@ const Settings: React.FC = () => {
                     onCheckedChange={setTwoFactorEnabled}
                   />
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <div className="flex items-center">
@@ -209,7 +222,7 @@ const Settings: React.FC = () => {
                     onCheckedChange={setNotificationsEnabled}
                   />
                 </div>
-                
+
                 <div className="pt-4">
                   <h3 className="text-lg font-medium mb-2">Security Check</h3>
                   <Button onClick={showNotImplementedToast} className="w-full">
@@ -217,12 +230,12 @@ const Settings: React.FC = () => {
                   </Button>
                 </div>
               </div>
-              
+
               <Button onClick={handleSaveSettings}>Save Security Settings</Button>
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         {/* Appearance Settings */}
         <TabsContent value="appearance">
           <Card>
@@ -239,34 +252,34 @@ const Settings: React.FC = () => {
                   <div className="grid grid-cols-3 gap-4">
                     <div
                       className={`border rounded-lg p-4 flex flex-col items-center cursor-pointer hover:border-primary transition-colors ${
-                        theme === 'light' ? 'border-primary bg-primary/5' : ''
+                        currentTheme === 'light' ? 'border-primary bg-primary/5' : ''
                       }`}
-                      onClick={() => setTheme('light')}
+                      onClick={() => setCurrentTheme('light')}
                     >
                       <Sun className="h-6 w-6 mb-2" />
                       <span>Light</span>
                     </div>
                     <div
                       className={`border rounded-lg p-4 flex flex-col items-center cursor-pointer hover:border-primary transition-colors ${
-                        theme === 'dark' ? 'border-primary bg-primary/5' : ''
+                        currentTheme === 'dark' ? 'border-primary bg-primary/5' : ''
                       }`}
-                      onClick={() => setTheme('dark')}
+                      onClick={() => setCurrentTheme('dark')}
                     >
                       <Moon className="h-6 w-6 mb-2" />
                       <span>Dark</span>
                     </div>
                     <div
                       className={`border rounded-lg p-4 flex flex-col items-center cursor-pointer hover:border-primary transition-colors ${
-                        theme === 'system' ? 'border-primary bg-primary/5' : ''
+                        currentTheme === 'system' ? 'border-primary bg-primary/5' : ''
                       }`}
-                      onClick={() => setTheme('system')}
+                      onClick={() => setCurrentTheme('system')}
                     >
                       <Laptop className="h-6 w-6 mb-2" />
                       <span>System</span>
                     </div>
                   </div>
                 </div>
-                
+
                 <div>
                   <h3 className="text-lg font-medium mb-2">Font Size</h3>
                   <Select defaultValue="medium">
@@ -280,7 +293,7 @@ const Settings: React.FC = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
                   <h3 className="text-lg font-medium mb-2">Accent Color</h3>
                   <Select defaultValue="blue">
@@ -295,7 +308,7 @@ const Settings: React.FC = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="autofill">AutoFill</Label>
@@ -310,12 +323,12 @@ const Settings: React.FC = () => {
                   />
                 </div>
               </div>
-              
+
               <Button onClick={handleSaveSettings}>Save Appearance Settings</Button>
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         {/* Sync Settings */}
         <TabsContent value="sync">
           <Card>
@@ -340,7 +353,7 @@ const Settings: React.FC = () => {
                     onCheckedChange={() => {}}
                   />
                 </div>
-                
+
                 <div>
                   <h3 className="text-lg font-medium mb-2">Sync Frequency</h3>
                   <Select defaultValue="automatic">
@@ -355,7 +368,7 @@ const Settings: React.FC = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
                   <h3 className="text-lg font-medium mb-2">Connected Devices</h3>
                   <div className="space-y-2">
@@ -371,7 +384,7 @@ const Settings: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div>
                   <h3 className="text-lg font-medium mb-2">Sync Actions</h3>
                   <div className="flex space-x-2">
@@ -380,11 +393,93 @@ const Settings: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+
               <Button onClick={handleSaveSettings}>Save Sync Settings</Button>
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Biometric Authentication */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Fingerprint className="h-5 w-5" />
+              <span>Biometric Authentication</span>
+            </CardTitle>
+            <CardDescription>
+              Use your fingerprint or face to log in quickly and securely
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!biometricSupported ? (
+              <div className="text-sm text-muted-foreground">
+                Biometric authentication is not supported on this device
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Biometric Login</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {biometricEnabled ? "Enabled" : "Disabled"}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {biometricEnabled ? (
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        Active
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">
+                        Inactive
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex space-x-2">
+                  {!biometricEnabled ? (
+                    <Button
+                      onClick={() => setShowBiometricSetup(true)}
+                      className="flex-1"
+                    >
+                      Set Up Biometric
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => {
+                        disableBiometric();
+                        toast({
+                          title: "Disabled",
+                          description: "Biometric authentication has been disabled",
+                        });
+                      }}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Disable Biometric
+                    </Button>
+                  )}
+                </div>
+
+                {showBiometricSetup && (
+                  <div className="mt-4">
+                    <BiometricSetup
+                      onComplete={() => {
+                        setShowBiometricSetup(false);
+                        toast({
+                          title: "Success",
+                          description: "Biometric authentication has been set up!",
+                        });
+                      }}
+                      onSkip={() => setShowBiometricSetup(false)}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </Tabs>
     </div>
   );

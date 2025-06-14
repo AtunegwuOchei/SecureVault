@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,8 @@ import { loginUserSchema } from "@shared/schema";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff, Fingerprint } from "lucide-react";
+import { useBiometric } from "@/hooks/use-biometric";
 
 const Login: React.FC = () => {
   const [, setLocation] = useLocation();
@@ -57,6 +58,30 @@ const Login: React.FC = () => {
     await loginMutation.mutateAsync(data);
   };
 
+  const { isSupported: biometricSupported, isEnabled: biometricEnabled, authenticateWithBiometric } = useBiometric();
+
+  const handleBiometricLogin = async () => {
+    // setIsLoading(true); // Assuming setIsLoading exists and is a state update function. It's not used in the original code.
+    // setError(""); // Assuming setError exists and is a state update function. It's not used in the original code.
+
+    try {
+      const username = await authenticateWithBiometric();
+      if (username) {
+        // For biometric login, we'll need to modify the auth system
+        // For now, we'll just redirect to a special flow
+        setLocation("/");
+      }
+    } catch (err: any) {
+      toast({
+        title: "Biometric authentication failed",
+        description: err.message || "Could not authenticate with biometrics",
+        variant: "destructive",
+      });
+    } finally {
+      // setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-8">
       <div className="w-full max-w-md">
@@ -69,7 +94,7 @@ const Login: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">SecureVault</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">Mobile Password Manager</p>
         </div>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>Login</CardTitle>
@@ -91,7 +116,7 @@ const Login: React.FC = () => {
                   <p className="text-sm text-red-500">{errors.username.message?.toString()}</p>
                 )}
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
@@ -116,7 +141,7 @@ const Login: React.FC = () => {
                   <p className="text-sm text-red-500">{errors.password.message?.toString()}</p>
                 )}
               </div>
-              
+
               <div className="flex items-center justify-between mb-4">
                 <Link href="/forgot-password" className="text-sm text-primary hover:underline">
                   Forgot password?
@@ -137,27 +162,28 @@ const Login: React.FC = () => {
                   "Login"
                 )}
               </Button>
-              
+
               <div className="mt-4 flex items-center">
                 <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
                 <span className="px-4 text-sm text-gray-500 dark:text-gray-400">or</span>
                 <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
               </div>
-              
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full mt-4 flex items-center justify-center gap-2"
-                onClick={() => toast({
-                  title: "Biometric authentication",
-                  description: "Biometric login will be available in the mobile app",
-                })}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
-                </svg>
-                Use Biometric Login
-              </Button>
+
+              {biometricSupported && biometricEnabled && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full mt-4 flex items-center justify-center gap-2"
+                    onClick={handleBiometricLogin}
+                    disabled={isSubmitting || loginMutation.isPending}
+                  >
+                    <Fingerprint className="mr-2 h-5 w-5" />
+                    {isSubmitting || loginMutation.isPending ? "Authenticating..." : "Use Biometric Login"}
+                  </Button>
+                </>
+              )}
+
             </form>
           </CardContent>
           <CardFooter className="flex flex-col items-center">
@@ -169,7 +195,7 @@ const Login: React.FC = () => {
             </p>
           </CardFooter>
         </Card>
-        
+
         <div className="mt-6 text-center">
           <div className="flex justify-center space-x-4 mb-4">
             <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={() => toast({
