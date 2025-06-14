@@ -27,7 +27,7 @@ class EmailService {
       }
     };
 
-    this.transporter = nodemailer.createTransporter(emailConfig);
+    this.transporter = nodemailer.createTransport(emailConfig);
   }
 
   async sendPasswordResetEmail(email: string, resetToken: string, resetUrl: string): Promise<void> {
