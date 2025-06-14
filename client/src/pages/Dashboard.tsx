@@ -8,7 +8,7 @@ import SecurityTips from "@/components/security/SecurityTips";
 import PremiumFeatures from "@/components/security/PremiumFeatures";
 import PasswordGenerator from "@/components/common/PasswordGenerator";
 import { Button } from "@/components/ui/button";
-import { useSession, signOut } from "next-auth/react";
+import { useAuth } from "@/hooks/use-auth";
 
 const Dashboard: React.FC = () => {
   // Fetch current user
@@ -38,8 +38,10 @@ const Dashboard: React.FC = () => {
       (passwordStats.strong / Math.max(1, passwordStats.total)) * 100
     ))) : 0;
 
+    const { logout } = useAuth();
+
     const handleLogout = async () => {
-      await signOut();
+      await logout();
     };
 
   return (
