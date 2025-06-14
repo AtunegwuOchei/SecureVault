@@ -638,6 +638,293 @@ app.get("/api/health", (req: Request, res: Response) => {
     }
   );
 
+  // ----- TEAM MANAGEMENT ROUTES -----
+  app.get(
+    "/api/teams",
+    isAuthenticated,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const teams = await storage.getTeamsByUserId(userId);
+        res.json(teams);
+      } catch (error) {
+        console.error("Get teams error:", error);
+        return handleServerError(res, "Failed to retrieve teams");
+      }
+    }
+  );
+
+  app.post(
+    "/api/teams",
+    isAuthenticated,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const result = createTeamSchema.safeParse(req.body);
+        if (!result.success) {
+          return res.status(400).json({
+            message: result.error.errors[0].message,
+          });
+        }
+
+        const team = await storage.createTeam({
+          ...result.data,
+          ownerId: userId
+        });
+
+        res.status(201).json(team);
+      } catch (error) {
+        console.error("Create team error:", error);
+        return handleServerError(res, "Failed to create team");
+      }
+    }
+  );
+
+  app.get(
+    "/api/teams/:id/members",
+    isAuthenticated,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const teamId = parseInt(req.params.id);
+        if (isNaN(teamId)) {
+          return res.status(400).json({ message: "Invalid team ID" });
+        }
+
+        const members = await storage.getTeamMembers(teamId);
+        res.json(members);
+      } catch (error) {
+        console.error("Get team members error:", error);
+        return handleServerError(res, "Failed to retrieve team members");
+      }
+    }
+  );
+
+  // ----- PASSWORD SHARING ROUTES -----
+  app.post(
+    "/api/passwords/:id/share",
+    isAuthenticated,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const passwordId = parseInt(req.params.id);
+        if (isNaN(passwordId)) {
+          return res.status(400).json({ message: "Invalid password ID" });
+        }
+
+        const result = sharePasswordSchema.safeParse(req.body);
+        if (!result.success) {
+          return res.status(400).json({
+            message: result.error.errors[0].message,
+          });
+        }
+
+        // Verify user owns the password
+        const password = await storage.getPasswordById(passwordId, userId);
+        if (!password) {
+          return res.status(404).json({ message: "Password not found" });
+        }
+
+        const sharedPassword = await storage.sharePassword({
+          passwordId,
+          sharedByUserId: userId,
+          ...result.data,
+          expiresAt: result.data.expiresAt ? new Date(result.data.expiresAt) : undefined
+        });
+
+        res.status(201).json(sharedPassword);
+      } catch (error) {
+        console.error("Share password error:", error);
+        return handleServerError(res, "Failed to share password");
+      }
+    }
+  );
+
+  app.get(
+    "/api/shared-passwords",
+    isAuthenticated,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const sharedWithMe = await storage.getSharedPasswordsForUser(userId);
+        const sharedByMe = await storage.getSharedPasswordsByOwner(userId);
+
+        res.json({
+          sharedWithMe,
+          sharedByMe
+        });
+      } catch (error) {
+        console.error("Get shared passwords error:", error);
+        return handleServerError(res, "Failed to retrieve shared passwords");
+      }
+    }
+  );
+
+  // ----- SHARED VAULT ROUTES -----
+  app.get(
+    "/api/shared-vaults",
+    isAuthenticated,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const vaults = await storage.getSharedVaultsForUser(userId);
+        res.json(vaults);
+      } catch (error) {
+        console.error("Get shared vaults error:", error);
+        return handleServerError(res, "Failed to retrieve shared vaults");
+      }
+    }
+  );
+
+  app.post(
+    "/api/shared-vaults",
+    isAuthenticated,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const result = createSharedVaultSchema.safeParse(req.body);
+        if (!result.success) {
+          return res.status(400).json({
+            message: result.error.errors[0].message,
+          });
+        }
+
+        const vault = await storage.createSharedVault({
+          ...result.data,
+          ownerId: userId
+        });
+
+        res.status(201).json(vault);
+      } catch (error) {
+        console.error("Create shared vault error:", error);
+        return handleServerError(res, "Failed to create shared vault");
+      }
+    }
+  );
+
+  app.get(
+    "/api/shared-vaults/:id/passwords",
+    isAuthenticated,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const vaultId = parseInt(req.params.id);
+        if (isNaN(vaultId)) {
+          return res.status(400).json({ message: "Invalid vault ID" });
+        }
+
+        const passwords = await storage.getVaultPasswords(vaultId, userId);
+        res.json(passwords);
+      } catch (error) {
+        console.error("Get vault passwords error:", error);
+        if (error.message === "Access denied to vault") {
+          return res.status(403).json({ message: "Access denied to vault" });
+        }
+        return handleServerError(res, "Failed to retrieve vault passwords");
+      }
+    }
+  );
+
+  app.post(
+    "/api/shared-vaults/:id/passwords",
+    isAuthenticated,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const vaultId = parseInt(req.params.id);
+        const { passwordId } = req.body;
+
+        if (isNaN(vaultId) || !passwordId) {
+          return res.status(400).json({ message: "Invalid vault or password ID" });
+        }
+
+        // Verify user owns the password
+        const password = await storage.getPasswordById(passwordId, userId);
+        if (!password) {
+          return res.status(404).json({ message: "Password not found" });
+        }
+
+        const entry = await storage.addPasswordToVault(vaultId, passwordId, userId);
+        res.status(201).json(entry);
+      } catch (error) {
+        console.error("Add password to vault error:", error);
+        return handleServerError(res, "Failed to add password to vault");
+      }
+    }
+  );
+
+  // ----- EMERGENCY ACCESS ROUTES -----
+  app.get(
+    "/api/emergency-access",
+    isAuthenticated,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const emergencyContacts = await storage.getEmergencyAccessByGrantor(userId);
+        res.json(emergencyContacts);
+      } catch (error) {
+        console.error("Get emergency access error:", error);
+        return handleServerError(res, "Failed to retrieve emergency access");
+      }
+    }
+  );
+
+  app.post(
+    "/api/emergency-access",
+    isAuthenticated,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const result = emergencyAccessSchema.safeParse(req.body);
+        if (!result.success) {
+          return res.status(400).json({
+            message: result.error.errors[0].message,
+          });
+        }
+
+        // Find emergency contact by email
+        const emergencyContact = await storage.getUserByEmail(result.data.emergencyContactEmail);
+        if (!emergencyContact) {
+          return res.status(404).json({ message: "Emergency contact not found" });
+        }
+
+        const emergencyAccess = await storage.createEmergencyAccess({
+          grantorId: userId,
+          emergencyContactId: emergencyContact.id,
+          accessLevel: result.data.accessLevel,
+          waitingPeriod: result.data.waitingPeriod
+        });
+
+        res.status(201).json(emergencyAccess);
+      } catch (error) {
+        console.error("Create emergency access error:", error);
+        return handleServerError(res, "Failed to create emergency access");
+      }
+    }
+  );
+
   // Add CORS headers middleware if needed
   app.use((req: Request, res: Response, next: NextFunction) => {
     res.header('Access-Control-Allow-Origin', '*');

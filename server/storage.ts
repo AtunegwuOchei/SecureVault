@@ -12,7 +12,14 @@ import {
   type InsertPassword,
   type UpdatePassword,
   type SecurityAlert,
-  type ActivityLog
+  type ActivityLog,
+	teams,
+	teamMembers,
+	sharedPasswords,
+	sharedVaults,
+	sharedVaultMembers,
+	sharedVaultPasswords,
+	emergencyAccess
 } from "@shared/schema";
 
 export interface IStorage {
@@ -284,6 +291,228 @@ export class DatabaseStorage implements IStorage {
 
     return { total, strong, weak, reused };
   }
+
+	async consumeResetToken(token: string): Promise<void> {
+		await db
+			.update(passwordResetTokens)
+			.set({ used: true })
+			.where(eq(passwordResetTokens.token, token));
+	}
+
+	// Team methods
+	async createTeam(data: { name: string; description?: string; ownerId: number }) {
+		const [team] = await db.insert(teams).values(data).returning();
+
+		// Add owner as team member
+		await db.insert(teamMembers).values({
+			teamId: team.id,
+			userId: data.ownerId,
+			role: "owner"
+		});
+
+		return team;
+	}
+
+	async getTeamsByUserId(userId: number) {
+		return await db
+			.select({
+				id: teams.id,
+				name: teams.name,
+				description: teams.description,
+				ownerId: teams.ownerId,
+				role: teamMembers.role,
+				memberCount: sql<number>`count(${teamMembers.userId})`,
+				createdAt: teams.createdAt
+			})
+			.from(teams)
+			.innerJoin(teamMembers, eq(teams.id, teamMembers.teamId))
+			.where(eq(teamMembers.userId, userId))
+			.groupBy(teams.id, teamMembers.role);
+	}
+
+	async getTeamMembers(teamId: number) {
+		return await db
+			.select({
+				id: teamMembers.id,
+				userId: users.id,
+				email: users.email,
+				name: users.name,
+				role: teamMembers.role,
+				joinedAt: teamMembers.joinedAt
+			})
+			.from(teamMembers)
+			.innerJoin(users, eq(teamMembers.userId, users.id))
+			.where(eq(teamMembers.teamId, teamId));
+	}
+
+	// Password sharing methods
+	async sharePassword(data: {
+		passwordId: number;
+		sharedByUserId: number;
+		sharedWithUserId?: number;
+		teamId?: number;
+		permissions: string;
+		expiresAt?: Date;
+	}) {
+		const [shared] = await db.insert(sharedPasswords).values(data).returning();
+		return shared;
+	}
+
+	async getSharedPasswordsForUser(userId: number) {
+		return await db
+			.select({
+				id: sharedPasswords.id,
+				passwordId: passwords.id,
+				title: passwords.title,
+				username: passwords.username,
+				url: passwords.url,
+				category: passwords.category,
+				strength: passwords.strength,
+				permissions: sharedPasswords.permissions,
+				sharedBy: users.name,
+				sharedByEmail: users.email,
+				expiresAt: sharedPasswords.expiresAt,
+				createdAt: sharedPasswords.createdAt
+			})
+			.from(sharedPasswords)
+			.innerJoin(passwords, eq(sharedPasswords.passwordId, passwords.id))
+			.innerJoin(users, eq(sharedPasswords.sharedByUserId, users.id))
+			.where(eq(sharedPasswords.sharedWithUserId, userId));
+	}
+
+	async getSharedPasswordsByOwner(userId: number) {
+		return await db
+			.select({
+				id: sharedPasswords.id,
+				passwordId: passwords.id,
+				title: passwords.title,
+				sharedWith: users.name,
+				sharedWithEmail: users.email,
+				permissions: sharedPasswords.permissions,
+				expiresAt: sharedPasswords.expiresAt,
+				createdAt: sharedPasswords.createdAt
+			})
+			.from(sharedPasswords)
+			.innerJoin(passwords, eq(sharedPasswords.passwordId, passwords.id))
+			.leftJoin(users, eq(sharedPasswords.sharedWithUserId, users.id))
+			.where(eq(sharedPasswords.sharedByUserId, userId));
+	}
+
+	// Shared vault methods
+	async createSharedVault(data: {
+		name: string;
+		description?: string;
+		ownerId: number;
+		teamId?: number;
+		isPublic?: boolean;
+	}) {
+		const [vault] = await db.insert(sharedVaults).values(data).returning();
+
+		// Add owner as vault member
+		await db.insert(sharedVaultMembers).values({
+			vaultId: vault.id,
+			userId: data.ownerId,
+			permissions: "admin",
+			invitedByUserId: data.ownerId
+		});
+
+		return vault;
+	}
+
+	async getSharedVaultsForUser(userId: number) {
+		return await db
+			.select({
+				id: sharedVaults.id,
+				name: sharedVaults.name,
+				description: sharedVaults.description,
+				ownerId: sharedVaults.ownerId,
+				isOwner: sql<boolean>`${sharedVaults.ownerId} = ${userId}`,
+				permissions: sharedVaultMembers.permissions,
+				passwordCount: sql<number>`count(${sharedVaultPasswords.passwordId})`,
+				createdAt: sharedVaults.createdAt
+			})
+			.from(sharedVaults)
+			.innerJoin(sharedVaultMembers, eq(sharedVaults.id, sharedVaultMembers.vaultId))
+			.leftJoin(sharedVaultPasswords, eq(sharedVaults.id, sharedVaultPasswords.vaultId))
+			.where(eq(sharedVaultMembers.userId, userId))
+			.groupBy(sharedVaults.id, sharedVaultMembers.permissions);
+	}
+
+	async getVaultPasswords(vaultId: number, userId: number) {
+		// Check if user has access to vault
+		const access = await db
+			.select()
+			.from(sharedVaultMembers)
+			.where(
+				and(
+					eq(sharedVaultMembers.vaultId, vaultId),
+					eq(sharedVaultMembers.userId, userId)
+				)
+			)
+			.limit(1);
+
+		if (access.length === 0) {
+			throw new Error("Access denied to vault");
+		}
+
+		return await db
+			.select({
+				id: passwords.id,
+				title: passwords.title,
+				username: passwords.username,
+				encryptedPassword: passwords.encryptedPassword,
+				url: passwords.url,
+				notes: passwords.notes,
+				category: passwords.category,
+				strength: passwords.strength,
+				addedBy: users.name,
+				addedAt: sharedVaultPasswords.createdAt
+			})
+			.from(sharedVaultPasswords)
+			.innerJoin(passwords, eq(sharedVaultPasswords.passwordId, passwords.id))
+			.innerJoin(users, eq(sharedVaultPasswords.addedByUserId, users.id))
+			.where(eq(sharedVaultPasswords.vaultId, vaultId));
+	}
+
+	async addPasswordToVault(vaultId: number, passwordId: number, userId: number) {
+		const [entry] = await db
+			.insert(sharedVaultPasswords)
+			.values({
+				vaultId,
+				passwordId,
+				addedByUserId: userId
+			})
+			.returning();
+		return entry;
+	}
+
+	// Emergency access methods
+	async createEmergencyAccess(data: {
+		grantorId: number;
+		emergencyContactId: number;
+		accessLevel: string;
+		waitingPeriod: number;
+	}) {
+		const [access] = await db.insert(emergencyAccess).values(data).returning();
+		return access;
+	}
+
+	async getEmergencyAccessByGrantor(grantorId: number) {
+		return await db
+			.select({
+				id: emergencyAccess.id,
+				emergencyContactId: users.id,
+				emergencyContactName: users.name,
+				emergencyContactEmail: users.email,
+				accessLevel: emergencyAccess.accessLevel,
+				waitingPeriod: emergencyAccess.waitingPeriod,
+				isActive: emergencyAccess.isActive,
+				createdAt: emergencyAccess.createdAt
+			})
+			.from(emergencyAccess)
+			.innerJoin(users, eq(emergencyAccess.emergencyContactId, users.id))
+			.where(eq(emergencyAccess.grantorId, grantorId));
+	}
 }
 
 export const storage = new DatabaseStorage();

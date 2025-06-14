@@ -19,7 +19,8 @@ import Register from "@/pages/Register";
 import BreachAlerts from "@/pages/BreachAlerts";
 import PasswordHealth from "@/pages/PasswordHealth";
 import SyncSettings from "@/pages/SyncSettings";
-import HelpSupport from "@/pages/HelpSupport";
+import HelpSupport from "./pages/HelpSupport";
+import EnterpriseFeatures from "./pages/EnterpriseFeatures";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 
@@ -112,6 +113,14 @@ function Router() {
         {isAuthPage ? null : (
           <MainLayout>
             <DeviceIntegration />
+          </MainLayout>
+        )}
+      </Route>
+      
+      <Route path="/enterprise">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <EnterpriseFeatures />
           </MainLayout>
         )}
       </Route>
