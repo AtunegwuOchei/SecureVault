@@ -908,15 +908,9 @@ app.get("/api/health", (req: Request, res: Response) => {
           });
         }
 
-        // Find emergency contact by email
-        const emergencyContact = await storage.getUserByEmail(result.data.emergencyContactEmail);
-        if (!emergencyContact) {
-          return res.status(404).json({ message: "Emergency contact not found" });
-        }
-
         const emergencyAccess = await storage.createEmergencyAccess({
           grantorId: userId,
-          emergencyContactId: emergencyContact.id,
+          emergencyContactEmail: result.data.emergencyContactEmail,
           accessLevel: result.data.accessLevel,
           waitingPeriod: result.data.waitingPeriod
         });

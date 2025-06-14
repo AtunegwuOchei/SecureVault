@@ -527,29 +527,70 @@ export class DatabaseStorage implements IStorage {
 	// Emergency access methods
 	async createEmergencyAccess(data: {
 		grantorId: number;
-		emergencyContactId: number;
+		emergencyContactEmail: string;
 		accessLevel: string;
 		waitingPeriod: number;
 	}) {
-		const [access] = await db.insert(emergencyAccess).values(data).returning();
-		return access;
+		// Try to find the user by email first
+		const emergencyContact = await this.getUserByEmail(data.emergencyContactEmail);
+		
+		if (emergencyContact) {
+			// User exists, use their ID
+			const [access] = await db.insert(emergencyAccess).values({
+				grantorId: data.grantorId,
+				emergencyContactId: emergencyContact.id,
+				accessLevel: data.accessLevel,
+				waitingPeriod: data.waitingPeriod
+			}).returning();
+			return access;
+		} else {
+			// For demo purposes, create a placeholder record
+			// In production, you'd send an invitation email
+			const [access] = await db.insert(emergencyAccess).values({
+				grantorId: data.grantorId,
+				emergencyContactId: -1, // Placeholder for non-existent user
+				accessLevel: data.accessLevel,
+				waitingPeriod: data.waitingPeriod
+			}).returning();
+			return { ...access, emergencyContactEmail: data.emergencyContactEmail };
+		}
 	}
 
 	async getEmergencyAccessByGrantor(grantorId: number) {
-		return await db
+		const results = await db
 			.select({
 				id: emergencyAccess.id,
-				emergencyContactId: users.id,
-				emergencyContactName: users.name,
-				emergencyContactEmail: users.email,
+				emergencyContactId: emergencyAccess.emergencyContactId,
 				accessLevel: emergencyAccess.accessLevel,
 				waitingPeriod: emergencyAccess.waitingPeriod,
 				isActive: emergencyAccess.isActive,
 				createdAt: emergencyAccess.createdAt
 			})
 			.from(emergencyAccess)
-			.innerJoin(users, eq(emergencyAccess.emergencyContactId, users.id))
 			.where(eq(emergencyAccess.grantorId, grantorId));
+
+		// For each result, try to get the user info
+		const enrichedResults = await Promise.all(
+			results.map(async (result) => {
+				if (result.emergencyContactId > 0) {
+					const user = await this.getUser(result.emergencyContactId);
+					return {
+						...result,
+						emergencyContactName: user?.name || "Unknown User",
+						emergencyContactEmail: user?.email || "unknown@example.com"
+					};
+				} else {
+					// This is a placeholder record for a non-existent user
+					return {
+						...result,
+						emergencyContactName: "Pending User",
+						emergencyContactEmail: "invite-pending@example.com"
+					};
+				}
+			})
+		);
+
+		return enrichedResults;
 	}
 }
 

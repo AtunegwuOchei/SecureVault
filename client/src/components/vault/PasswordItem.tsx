@@ -1,14 +1,38 @@
 import React, { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useClipboard } from "@/hooks/use-clipboard";
-import { maskPassword } from "@/lib/utils";
-import { Eye, EyeOff, Copy, Edit, Trash, Star, StarOff } from "lucide-react";
-import { Password } from "@shared/schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useClipboard } from "@/hooks/use-clipboard";
 import { useToast } from "@/hooks/use-toast";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import {
+  Eye,
+  EyeOff,
+  Copy,
+  Edit,
+  Trash2,
+  Star,
+  MoreVertical,
+  ExternalLink,
+  Share2,
+} from "lucide-react";
+import { decryptData } from "@/lib/encryption";
+import { Password } from "@shared/schema";
 
 interface PasswordItemProps {
   password: Password;
@@ -17,31 +41,75 @@ interface PasswordItemProps {
 
 const PasswordItem: React.FC<PasswordItemProps> = ({ password, onEdit }) => {
   const [showPassword, setShowPassword] = useState(false);
-  const { onCopy } = useClipboard();
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [decryptedPassword, setDecryptedPassword] = useState<string>("");
+  const [shareData, setShareData] = useState({
+    sharedWithUserId: "",
+    permissions: "view" as "view" | "edit" | "admin",
+    expiresAt: ""
+  });
+
+  const { copyToClipboard } = useClipboard();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Favorites mutation
   const toggleFavoriteMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest(
-        "PUT", 
-        `/api/passwords/${password.id}`, 
-        { isFavorite: !password.isFavorite }
-      );
+      const response = await fetch(`/api/passwords/${password.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFavorite: !password.isFavorite }),
+      });
+      if (!response.ok) throw new Error("Failed to update favorite status");
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/passwords'] });
       toast({
         title: password.isFavorite ? "Removed from favorites" : "Added to favorites",
-        description: `${password.title} has been ${password.isFavorite ? "removed from" : "added to"} your favorites`,
+        description: `${password.title} has been ${password.isFavorite ? "removed from" : "added to"} your favorites.`,
       });
     },
     onError: () => {
       toast({
-        title: "Action failed",
-        description: "Could not update favorite status",
+        title: "Error",
+        description: "Failed to update favorite status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sharePasswordMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/passwords/${password.id}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sharedWithUserId: parseInt(shareData.sharedWithUserId),
+          permissions: shareData.permissions,
+          expiresAt: shareData.expiresAt || undefined
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to share password");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsShareOpen(false);
+      setShareData({ sharedWithUserId: "", permissions: "view", expiresAt: "" });
+      toast({
+        title: "Password shared",
+        description: `${password.title} has been shared successfully.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -75,7 +143,7 @@ const PasswordItem: React.FC<PasswordItemProps> = ({ password, onEdit }) => {
 
   // Handle copy password
   const handleCopyPassword = () => {
-    onCopy(password.encryptedPassword);
+    copyToClipboard(password.encryptedPassword);
     toast({
       title: "Password copied",
       description: "Password has been copied to clipboard",
@@ -95,129 +163,176 @@ const PasswordItem: React.FC<PasswordItemProps> = ({ password, onEdit }) => {
   // Render strength badge
   const renderStrengthBadge = () => {
     if (password.strength >= 80) {
-      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">Strong</span>;
+      return <Badge variant="success">Strong</Badge>;
     } else if (password.strength >= 60) {
-      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">Good</span>;
+      return <Badge variant="info">Good</Badge>;
     } else if (password.strength >= 40) {
-      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">Fair</span>;
+      return <Badge variant="warning">Fair</Badge>;
     } else {
-      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">Weak</span>;
+      return <Badge variant="destructive">Weak</Badge>;
     }
   };
 
   return (
-    <Card className="p-4 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="h-10 w-10 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center overflow-hidden">
-            <span className="text-sm font-medium text-primary">
-              {password.title.substring(0, 2).toUpperCase()}
-            </span>
+    <Card className="w-full">
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="rounded-full bg-secondary w-10 h-10 flex items-center justify-center">
+              <span className="text-sm font-medium text-secondary-foreground">
+                {password.title.substring(0, 2).toUpperCase()}
+              </span>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">{password.title}</h3>
+              <p className="text-sm text-muted-foreground">{password.username}</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-medium text-gray-900 dark:text-gray-100">{password.title}</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{password.username}</p>
-          </div>
-        </div>
-        <div className="flex items-center space-x-1">
           {renderStrengthBadge()}
         </div>
-      </div>
 
-      <div className="mt-4 flex items-center">
-        <div className="relative flex-1">
-          <input
-            type={showPassword ? "text" : "password"}
-            value={showPassword ? password.encryptedPassword : maskPassword(password.encryptedPassword)}
-            readOnly
-            className="block w-full py-2 px-3 border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-md shadow-sm text-sm mono"
-          />
-        </div>
-        <div className="ml-2 flex space-x-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowPassword(!showPassword)}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-          >
-            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleCopyPassword}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-          >
-            <Copy size={18} />
-          </Button>
-        </div>
-      </div>
-
-      <div className="mt-4 flex justify-between">
         <div>
-          {password.url && (
-            <a
-              href={password.url.startsWith('http') ? password.url : `https://${password.url}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-primary hover:text-primary-dark"
+          <div className="flex items-center">
+            <Input
+              type={showPassword ? "text" : "password"}
+              value={password.encryptedPassword}
+              readOnly
+              className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowPassword(!showPassword)}
             >
-              Visit Site
-            </a>
-          )}
+              {showPassword ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleCopyPassword}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-        <div className="flex space-x-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleToggleFavorite}
-            disabled={toggleFavoriteMutation.isPending}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-          >
-            {password.isFavorite ? (
-              <Star size={18} className="fill-yellow-400 text-yellow-400" />
-            ) : (
-              <StarOff size={18} />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleEdit}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-          >
-            <Edit size={18} />
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-500"
+
+        <div className="flex justify-between items-center">
+          {password.url && (
+            <Button variant="link" asChild>
+              <a
+                href={password.url.startsWith('http') ? password.url : `https://${password.url}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm"
               >
-                <Trash size={18} />
+                Visit Site
+                <ExternalLink className="ml-1 h-4 w-4" />
+              </a>
+            </Button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreVertical className="h-4 w-4" />
               </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Password</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete this password? This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={() => deletePasswordMutation.mutate()}
-                  className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setIsEditOpen(true)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsShareOpen(true)}>
+                <Share2 className="mr-2 h-4 w-4" />
+                Share
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => toggleFavoriteMutation.mutate()}
+                disabled={toggleFavoriteMutation.isPending}
+              >
+                <Star className={`mr-2 h-4 w-4 ${password.isFavorite ? "fill-yellow-400 text-yellow-400" : ""}`} />
+                {password.isFavorite ? "Remove from favorites" : "Add to favorites"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-red-600"
+                onClick={() => deletePasswordMutation.mutate()}
+                disabled={deletePasswordMutation.isPending}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </div>
+      </CardContent>
+
+      {/* Share Password Dialog */}
+      <Dialog open={isShareOpen} onOpenChange={setIsShareOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Share "{password.title}"</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="userId">User ID to share with</Label>
+              <Input
+                id="userId"
+                type="number"
+                value={shareData.sharedWithUserId}
+                onChange={(e) => setShareData(prev => ({ ...prev, sharedWithUserId: e.target.value }))}
+                placeholder="Enter user ID"
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                Note: In a production app, this would be an email search
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="permissions">Permissions</Label>
+              <Select 
+                value={shareData.permissions} 
+                onValueChange={(value: "view" | "edit" | "admin") => 
+                  setShareData(prev => ({ ...prev, permissions: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="view">View Only</SelectItem>
+                  <SelectItem value="edit">Edit</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="expiresAt">Expires At (optional)</Label>
+              <Input
+                id="expiresAt"
+                type="date"
+                value={shareData.expiresAt}
+                onChange={(e) => setShareData(prev => ({ ...prev, expiresAt: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setIsShareOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => sharePasswordMutation.mutate()}
+                disabled={sharePasswordMutation.isPending || !shareData.sharedWithUserId}
+              >
+                {sharePasswordMutation.isPending ? "Sharing..." : "Share Password"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

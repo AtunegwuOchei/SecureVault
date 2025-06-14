@@ -22,6 +22,9 @@ import PasswordHealth from "@/pages/PasswordHealth";
 import SyncSettings from "@/pages/SyncSettings";
 import HelpSupport from "./pages/HelpSupport";
 import EnterpriseFeatures from "./pages/EnterpriseFeatures";
+import SharedVaultsPage from "@/pages/SharedVaults";
+import PasswordSharingPage from "@/pages/PasswordSharing";
+import EmergencyAccessPage from "@/pages/EmergencyAccess";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 
@@ -117,11 +120,35 @@ function Router() {
           </MainLayout>
         )}
       </Route>
-      
+
       <Route path="/enterprise">
         {isAuthPage ? null : (
           <MainLayout>
             <EnterpriseFeatures />
+          </MainLayout>
+        )}
+      </Route>
+
+      <Route path="/shared-vaults">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <SharedVaultsPage />
+          </MainLayout>
+        )}
+      </Route>
+
+      <Route path="/password-sharing">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <PasswordSharingPage />
+          </MainLayout>
+        )}
+      </Route>
+
+      <Route path="/emergency-access">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <EmergencyAccessPage />
           </MainLayout>
         )}
       </Route>
