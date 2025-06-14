@@ -20,6 +20,8 @@ import BreachAlerts from "@/pages/BreachAlerts";
 import PasswordHealth from "@/pages/PasswordHealth";
 import SyncSettings from "@/pages/SyncSettings";
 import HelpSupport from "@/pages/HelpSupport";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 
 function Router() {
   const [location] = useLocation();
@@ -30,8 +32,8 @@ function Router() {
       {/* Auth Routes */}
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
-      <Route path="/forgot-password" component={React.lazy(() => import("@/pages/ForgotPassword"))} />
-      <Route path="/reset-password/:token" component={React.lazy(() => import("@/pages/ResetPassword"))} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password/:token" component={ResetPassword} />
 
       {/* Protected Routes */}
       <Route path="/">
