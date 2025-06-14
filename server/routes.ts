@@ -14,13 +14,18 @@ import {
   generatePassword as generatePasswordUtil,
   isValidEmail,
   isStrongPassword,
+  hashPassword,
 } from "./utils";
+import { emailService } from "./email";
+import { passwordResetService } from "./password-reset";
 import {
   insertPasswordSchema,
   updatePasswordSchema,
   loginUserSchema,
   insertUserSchema,
   passwordGeneratorSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
   type PasswordGenerator,
 } from "@shared/schema";
 
@@ -163,6 +168,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error instanceof Error ? error.message : error
       );
       return handleServerError(res, "Failed to get current user");
+    }
+  });
+
+  app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+    try {
+      const result = forgotPasswordSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: result.error.errors[0].message,
+        });
+      }
+
+      const { email } = result.data;
+
+      // Check if user exists
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Don't reveal if email exists or not for security
+        return res.json({ message: "If that email is registered, we've sent a reset link" });
+      }
+
+      // Generate reset token
+      const resetToken = await passwordResetService.createResetToken(user.id);
+      
+      // Create reset URL
+      const resetUrl = `${req.protocol}://${req.get('host')}/reset-password/${resetToken}`;
+
+      // Send email
+      try {
+        await emailService.sendPasswordResetEmail(email, resetToken, resetUrl);
+      } catch (emailError) {
+        console.error("Email sending failed:", emailError);
+        // In development, still allow the process to continue
+        if (process.env.NODE_ENV !== "development") {
+          return res.status(500).json({ message: "Failed to send reset email" });
+        }
+      }
+
+      // Log activity
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "password_reset_requested",
+        details: "Password reset email sent",
+        ipAddress: (req.headers["x-forwarded-for"] || req.ip) as string || "",
+        userAgent: req.headers["user-agent"] || "",
+      });
+
+      res.json({ message: "If that email is registered, we've sent a reset link" });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      return handleServerError(res, "An error occurred while processing your request");
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+    try {
+      const result = resetPasswordSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: result.error.errors[0].message,
+        });
+      }
+
+      const { token, password } = result.data;
+
+      // Verify token
+      const tokenData = await passwordResetService.verifyResetToken(token);
+      if (!tokenData) {
+        return res.status(400).json({ 
+          message: "Invalid or expired reset token" 
+        });
+      }
+
+      // Check password strength
+      if (!isStrongPassword(password)) {
+        return res.status(400).json({
+          message: "Password is too weak. It must have uppercase, lowercase, numbers, symbols and be at least 8 characters long.",
+        });
+      }
+
+      // Hash new password
+      const { hash, salt } = await hashPassword(password);
+
+      // Update user password
+      const user = await storage.getUser(tokenData.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      await storage.updateUserPassword(tokenData.userId, hash, salt);
+
+      // Mark token as used
+      await passwordResetService.consumeResetToken(token);
+
+      // Log activity
+      await storage.createActivityLog({
+        userId: tokenData.userId,
+        action: "password_reset_completed",
+        details: "Password successfully reset",
+        ipAddress: (req.headers["x-forwarded-for"] || req.ip) as string || "",
+        userAgent: req.headers["user-agent"] || "",
+      });
+
+      res.json({ message: "Password reset successful" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      return handleServerError(res, "An error occurred while resetting your password");
     }
   });
 

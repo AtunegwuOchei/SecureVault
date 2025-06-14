@@ -1,10 +1,11 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
   passwords,
   securityAlerts,
   activityLogs,
+  passwordResetTokens,
   type User,
   type InsertUser,
   type Password,
@@ -22,6 +23,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserLastLogin(id: number): Promise<void>;
   updateUserPremiumStatus(id: number, isPremium: boolean): Promise<void>;
+  updateUserPassword(id: number, passwordHash: string, salt: string): Promise<void>;
 
   // Password methods
   getPasswordsByUserId(userId: number): Promise<Password[]>;
@@ -38,6 +40,19 @@ export interface IStorage {
   // Activity Log methods
   getActivityLogsByUserId(userId: number, limit?: number): Promise<ActivityLog[]>;
   createActivityLog(log: Omit<ActivityLog, 'id' | 'createdAt'>): Promise<ActivityLog>;
+
+    // Password reset tokens
+	createPasswordResetToken(tokenData: {
+		userId: number;
+		token: string;
+		expiresAt: Date;
+		used: boolean;
+	}): Promise<any>;
+	getPasswordResetToken(token: string): Promise<any>;
+	markPasswordResetTokenAsUsed(token: string): Promise<boolean>;
+	invalidatePasswordResetTokens(userId: number): Promise<void>;
+	deleteExpiredPasswordResetTokens(): Promise<void>;
+
 
   // Password health methods
   getPasswordStats(userId: number): Promise<{
@@ -93,6 +108,16 @@ export class DatabaseStorage implements IStorage {
       .set({ isPremium })
       .where(eq(users.id, id));
   }
+
+  async updateUserPassword(userId: number, passwordHash: string, salt: string): Promise<void> {
+		await db
+			.update(users)
+			.set({ 
+				password_hash: passwordHash,
+				salt: salt 
+			})
+			.where(eq(users.id, userId));
+	}
 
   // Password methods
   async getPasswordsByUserId(userId: number): Promise<Password[]> {
@@ -189,6 +214,50 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return newLog;
+  }
+
+  // Password reset tokens
+  async createPasswordResetToken(tokenData: {
+    userId: number;
+    token: string;
+    expiresAt: Date;
+    used: boolean;
+  }) {
+    const [newToken] = await db
+      .insert(passwordResetTokens)
+      .values(tokenData)
+      .returning();
+    return newToken;
+  }
+
+  async getPasswordResetToken(token: string) {
+    const [resetToken] = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.token, token))
+      .limit(1);
+    return resetToken;
+  }
+
+  async markPasswordResetTokenAsUsed(token: string): Promise<boolean> {
+    const result = await db
+      .update(passwordResetTokens)
+      .set({ used: true })
+      .where(eq(passwordResetTokens.token, token));
+    return result.length > 0;
+  }
+
+  async invalidatePasswordResetTokens(userId: number): Promise<void> {
+    await db
+      .update(passwordResetTokens)
+      .set({ used: true })
+      .where(eq(passwordResetTokens.userId, userId));
+  }
+
+  async deleteExpiredPasswordResetTokens(): Promise<void> {
+    await db
+      .delete(passwordResetTokens)
+      .where(sql`${passwordResetTokens.expiresAt} < NOW()`);
   }
 
   // Password health methods

@@ -30,6 +30,8 @@ function Router() {
       {/* Auth Routes */}
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/forgot-password" component={React.lazy(() => import("@/pages/ForgotPassword"))} />
+      <Route path="/reset-password/:token" component={React.lazy(() => import("@/pages/ResetPassword"))} />
 
       {/* Protected Routes */}
       <Route path="/">
