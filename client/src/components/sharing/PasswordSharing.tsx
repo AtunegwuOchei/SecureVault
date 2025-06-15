@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Share2, Eye, Edit, Shield, Users, Clock, ExternalLink } from "lucide-react";
+import { Share2, Eye, Edit, Shield, Users, Clock, ExternalLink, Plus } from "lucide-react";
 
 interface SharedPassword {
   id: number;
@@ -35,11 +35,79 @@ interface SharedPasswords {
 
 const PasswordSharing: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'received' | 'shared'>('received');
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [shareForm, setShareForm] = useState({
+    passwordId: '',
+    sharedWithUserEmail: '',
+    permissions: 'view',
+    expiresAt: ''
+  });
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: sharedPasswords, isLoading } = useQuery<SharedPasswords>({
     queryKey: ['/api/shared-passwords'],
   });
+
+  const { data: passwords } = useQuery({
+    queryKey: ['/api/passwords'],
+  });
+
+  const sharePasswordMutation = useMutation({
+    mutationFn: async (shareData: any) => {
+      const response = await fetch(`/api/passwords/${shareData.passwordId}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(shareData),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to share password');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/shared-passwords'] });
+      setIsShareDialogOpen(false);
+      setShareForm({
+        passwordId: '',
+        sharedWithUserEmail: '',
+        permissions: 'view',
+        expiresAt: ''
+      });
+      toast({
+        title: "Success",
+        description: "Password shared successfully!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSharePassword = () => {
+    if (!shareForm.passwordId || !shareForm.sharedWithUserEmail) {
+      toast({
+        title: "Error",
+        description: "Please select a password and enter an email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const shareData = {
+      passwordId: parseInt(shareForm.passwordId),
+      sharedWithUserEmail: shareForm.sharedWithUserEmail,
+      permissions: shareForm.permissions,
+      ...(shareForm.expiresAt && { expiresAt: shareForm.expiresAt })
+    };
+
+    sharePasswordMutation.mutate(shareData);
+  };
 
   const getPermissionBadge = (permission: string) => {
     switch (permission) {
@@ -80,11 +148,102 @@ const PasswordSharing: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Password Sharing</h2>
-        <p className="text-muted-foreground">
-          Manage passwords shared with you and by you
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold">Password Sharing</h2>
+          <p className="text-muted-foreground">
+            Manage passwords shared with you and by you
+          </p>
+        </div>
+        
+        <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Share Password
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Share Password</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="passwordSelect">Select Password</Label>
+                <Select
+                  value={shareForm.passwordId}
+                  onValueChange={(value) => setShareForm(prev => ({ ...prev, passwordId: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a password to share" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {passwords?.map((password: any) => (
+                      <SelectItem key={password.id} value={password.id.toString()}>
+                        {password.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="userEmail">User Email</Label>
+                <Input
+                  id="userEmail"
+                  type="email"
+                  value={shareForm.sharedWithUserEmail}
+                  onChange={(e) => setShareForm(prev => ({ ...prev, sharedWithUserEmail: e.target.value }))}
+                  placeholder="Enter user's email address"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="permissions">Permissions</Label>
+                <Select
+                  value={shareForm.permissions}
+                  onValueChange={(value) => setShareForm(prev => ({ ...prev, permissions: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="view">View Only</SelectItem>
+                    <SelectItem value="edit">Edit</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="expiresAt">Expires At (Optional)</Label>
+                <Input
+                  id="expiresAt"
+                  type="datetime-local"
+                  value={shareForm.expiresAt}
+                  onChange={(e) => setShareForm(prev => ({ ...prev, expiresAt: e.target.value }))}
+                />
+              </div>
+              
+              <div className="flex space-x-2">
+                <Button
+                  onClick={() => setIsShareDialogOpen(false)}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSharePassword}
+                  className="flex-1"
+                  disabled={sharePasswordMutation.isPending}
+                >
+                  {sharePasswordMutation.isPending ? "Sharing..." : "Share Password"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="flex space-x-4 border-b">

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 
 interface BiometricCredential {
@@ -11,42 +10,61 @@ export const useBiometric = () => {
   const [isEnabled, setIsEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    // Check if WebAuthn is supported
-    const checkSupport = () => {
-      const supported = typeof window !== 'undefined' && 
-                       'credentials' in navigator && 
-                       'create' in navigator.credentials &&
-                       'get' in navigator.credentials;
-      setIsSupported(supported);
-    };
+  const checkSupport = async () => {
+    try {
+      const supported = !!(
+        window.PublicKeyCredential &&
+        navigator.credentials &&
+        navigator.credentials.create &&
+        navigator.credentials.get
+      );
 
+      if (supported) {
+        // Check if platform authenticator is available
+        const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+        setIsSupported(available);
+      } else {
+        setIsSupported(false);
+      }
+    } catch (error) {
+      console.warn('Error checking biometric support:', error);
+      setIsSupported(false);
+    }
+  };
+
+  useEffect(() => {
     checkSupport();
 
     // Check if biometric is already enabled
-    const biometricEnabled = localStorage.getItem('biometric_enabled') === 'true';
-    setIsEnabled(biometricEnabled);
+    const enabled = localStorage.getItem('biometric_enabled') === 'true';
+    setIsEnabled(enabled);
   }, []);
 
   const setupBiometric = async (username: string): Promise<boolean> => {
     if (!isSupported) {
-      throw new Error('Biometric authentication is not supported on this device');
+      throw new Error('WebAuthn is not supported on this device');
     }
 
     setIsLoading(true);
-
     try {
-      // Generate a random challenge
-      const challenge = new Uint8Array(32);
-      crypto.getRandomValues(challenge);
+      // Check if the browser supports the required APIs
+      if (!navigator.credentials || !navigator.credentials.create) {
+        throw new Error('This browser does not support biometric authentication');
+      }
 
-      // Create credential options
-      const credentialCreationOptions: CredentialCreationOptions = {
+      // Check for platform authenticator availability
+      const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (!available) {
+        throw new Error('No biometric authenticator available on this device');
+      }
+
+      // Create new credentials
+      const credential = await navigator.credentials.create({
         publicKey: {
-          challenge,
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
           rp: {
-            name: "SecureVault",
-            id: window.location.hostname,
+            name: 'Password Manager',
+            id: window.location.hostname === 'localhost' ? 'localhost' : window.location.hostname,
           },
           user: {
             id: new TextEncoder().encode(username),
@@ -54,47 +72,63 @@ export const useBiometric = () => {
             displayName: username,
           },
           pubKeyCredParams: [
-            {
-              type: "public-key",
-              alg: -7, // ES256
-            },
-            {
-              type: "public-key", 
-              alg: -257, // RS256
-            }
+            { alg: -7, type: 'public-key' },  // ES256
+            { alg: -257, type: 'public-key' } // RS256
           ],
           authenticatorSelection: {
-            authenticatorAttachment: "platform",
-            userVerification: "required",
-            requireResidentKey: false,
+            authenticatorAttachment: 'platform',
+            userVerification: 'required',
+            requireResidentKey: false
           },
           timeout: 60000,
-          attestation: "direct",
-        },
-      };
+          attestation: 'none'
+        }
+      }) as PublicKeyCredential;
 
-      // Create the credential
-      const credential = await navigator.credentials.create(credentialCreationOptions) as PublicKeyCredential;
+      if (credential && credential.response) {
+        // Extract the public key from the credential response
+        const response = credential.response as AuthenticatorAttestationResponse;
+        const clientDataJSON = new TextDecoder().decode(response.clientDataJSON);
 
-      if (credential) {
-        // Store credential info locally
-        const credentialInfo: BiometricCredential = {
-          id: credential.id,
-          publicKey: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
-        };
+        // Store the credential on the server
+        const serverResponse = await fetch('/api/auth/biometric/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            credentialId: credential.id,
+            publicKey: Array.from(new Uint8Array(response.getPublicKey() || new ArrayBuffer(0))).join(',')
+          }),
+        });
 
-        localStorage.setItem('biometric_credential', JSON.stringify(credentialInfo));
-        localStorage.setItem('biometric_enabled', 'true');
-        localStorage.setItem('biometric_username', username);
-        
-        setIsEnabled(true);
-        return true;
+        if (serverResponse.ok) {
+          setIsEnabled(true);
+          localStorage.setItem('biometric_enabled', 'true');
+          localStorage.setItem('biometric_credential_id', credential.id);
+          return true;
+        } else {
+          const errorData = await serverResponse.json();
+          throw new Error(errorData.message || 'Failed to store biometric credentials');
+        }
       }
 
-      return false;
-    } catch (error) {
+      throw new Error('Failed to create biometric credential');
+    } catch (error: any) {
       console.error('Biometric setup failed:', error);
-      throw error;
+
+      // Provide user-friendly error messages
+      if (error.name === 'NotSupportedError') {
+        throw new Error('Biometric authentication is not supported on this device');
+      } else if (error.name === 'NotAllowedError') {
+        throw new Error('Biometric authentication was cancelled or not allowed');
+      } else if (error.name === 'InvalidStateError') {
+        throw new Error('A credential with this ID already exists');
+      } else if (error.name === 'SecurityError') {
+        throw new Error('Security error: Make sure you are using HTTPS');
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Failed to set up biometric authentication');
+      }
     } finally {
       setIsLoading(false);
     }
