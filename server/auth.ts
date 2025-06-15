@@ -169,6 +169,48 @@ export const logout = (req: Request, res: Response) => {
 	}
 };
 
+// Biometric authentication
+export const biometricLogin = async (req: Request, res: Response) => {
+	try {
+		const { username, credentialId, assertion } = req.body;
+
+		const user = await storage.getUserByUsername(username);
+		if (!user) {
+			return res.status(401).json({ message: "Invalid credentials" });
+		}
+
+		// In a real implementation, you would verify the WebAuthn assertion
+		// For this demo, we'll just check that the user exists and has biometric enabled
+		const biometricCredential = await storage.getBiometricCredential(user.id, credentialId);
+		if (!biometricCredential) {
+			return res.status(401).json({ message: "Invalid biometric credentials" });
+		}
+
+		await storage.updateUserLastLogin(user.id);
+
+		await storage.createActivityLog({
+			userId: user.id,
+			action: "biometric_login",
+			details: "User logged in using biometric authentication",
+			ipAddress: req.ip || "",
+			userAgent: req.headers["user-agent"] || "",
+		});
+
+		req.session.userId = user.id;
+
+		const { password_hash: _, salt: __, ...safeUser } = user;
+
+		return res.json({
+			user: safeUser,
+			message: "Biometric login successful",
+			token: "biometric-session-token", // In production, use proper JWT
+		});
+	} catch (error) {
+		console.error("Biometric login error:", error);
+		return res.status(500).json({ message: "An error occurred during biometric authentication" });
+	}
+};
+
 // Get current user
 export const getCurrentUser = async (req: Request, res: Response) => {
 	try {

@@ -100,7 +100,7 @@ export const useBiometric = () => {
     }
   };
 
-  const authenticateWithBiometric = async (): Promise<string | null> => {
+  const authenticateWithBiometric = async (): Promise<{ username: string; token: string } | null> => {
     if (!isSupported || !isEnabled) {
       throw new Error('Biometric authentication is not available');
     }
@@ -140,7 +140,33 @@ export const useBiometric = () => {
       const assertion = await navigator.credentials.get(credentialRequestOptions) as PublicKeyCredential;
 
       if (assertion) {
-        return storedUsername;
+        // Send biometric authentication request to server
+        const response = await fetch('/api/auth/biometric', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: storedUsername,
+            credentialId: credential.id,
+            assertion: {
+              id: assertion.id,
+              rawId: btoa(String.fromCharCode(...new Uint8Array(assertion.rawId))),
+              response: {
+                authenticatorData: btoa(String.fromCharCode(...new Uint8Array((assertion.response as AuthenticatorAssertionResponse).authenticatorData))),
+                clientDataJSON: btoa(String.fromCharCode(...new Uint8Array((assertion.response as AuthenticatorAssertionResponse).clientDataJSON))),
+                signature: btoa(String.fromCharCode(...new Uint8Array((assertion.response as AuthenticatorAssertionResponse).signature))),
+              }
+            }
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          return { username: storedUsername, token: data.token };
+        } else {
+          throw new Error('Server authentication failed');
+        }
       }
 
       return null;

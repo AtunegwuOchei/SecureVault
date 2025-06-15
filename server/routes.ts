@@ -8,6 +8,7 @@ import {
   register,
   logout,
   getCurrentUser,
+  biometricLogin
 } from "./auth";
 import {
   calculatePasswordStrength,
@@ -163,6 +164,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/auth/biometric", biometricLogin);
+
+  app.post("/api/auth/biometric/setup", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const { credentialId, publicKey } = req.body;
+      await storage.storeBiometricCredential(req.session.userId!, credentialId, publicKey);
+      res.json({ message: "Biometric credentials stored successfully" });
+    } catch (error) {
+      console.error("Error storing biometric credentials:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   app.get("/api/auth/me", async (req: Request, res: Response) => {
     try {
       await getCurrentUser(req, res);
@@ -195,7 +209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate reset token
       const resetToken = await passwordResetService.createResetToken(user.id);
-      
+
       // Create reset URL
       const resetUrl = `${req.protocol}://${req.get('host')}/reset-password/${resetToken}`;
 
@@ -472,22 +486,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // ----- SECURITY ALERTS ROUTES -----
-  app.get(
-    "/api/security-alerts",
-    isAuthenticated,
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const userId = req.session.userId;
+    app.get("/api/security-alerts", isAuthenticated, async (req: Request, res: Response) => {
+		try {
+			const alerts = await storage.getSecurityAlertsByUserId(req.session.userId!);
+			res.json(alerts);
+		} catch (error) {
+			console.error("Error fetching security alerts:", error);
+			return handleServerError(res, "Internal server error");
+		}
+	});
+
+	// Enterprise Features Routes
+
+	// Shared Vaults
+	app.get("/api/shared-vaults", isAuthenticated, async (req: Request, res: Response) => {
+		try {
+			const vaults = await storage.getSharedVaultsForUser(req.session.userId!);
+			res.json(vaults);
+		} catch (error) {
+			console.error("Error fetching shared vaults:", error);
+			return handleServerError(res, "Internal server error");
+		}
+	});
+
+	app.post("/api/shared-vaults", isAuthenticated, async (req: Request, res: Response) => {
+		try {
+			const userId = req.session.userId;
         if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-        const alerts = await storage.getSecurityAlertsByUserId(userId);
-        res.json(alerts);
-      } catch (error) {
-        console.error("Get security alerts error:", error);
-        return handleServerError(res, "Failed to retrieve security alerts");
-      }
-    }
-  );
+        const result = createSharedVaultSchema.safeParse(req.body);
+        if (!result.success) {
+          return res.status(400).json({
+            message: result.error.errors[0].message,
+          });
+        }
+
+        const vault = await storage.createSharedVault({
+          ...result.data,
+          ownerId: userId
+        });
+
+        res.status(201).json(vault);
+		} catch (error) {
+			console.error("Error creating shared vault:", error);
+			return handleServerError(res, "Internal server error");
+		}
+	});
+
+	// Password Sharing
+	app.get("/api/password-shares", isAuthenticated, async (req: Request, res: Response) => {
+		try {
+			const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const sharedWithMe = await storage.getSharedPasswordsForUser(userId);
+        const sharedByMe = await storage.getSharedPasswordsByOwner(userId);
+
+        res.json({
+          sharedWithMe,
+          sharedByMe
+        });
+		} catch (error) {
+			console.error("Error fetching password shares:", error);
+			return handleServerError(res, "Internal server error");
+		}
+	});
+
+	app.post("/api/password-shares", isAuthenticated, async (req: Request, res: Response) => {
+		try {
+			const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const passwordId = parseInt(req.params.id);
+        if (isNaN(passwordId)) {
+          return res.status(400).json({ message: "Invalid password ID" });
+        }
+
+        // Handle both old schema and email-based sharing
+        const { sharedWithUserEmail, sharedWithUserId, ...restData } = req.body;
+
+        let shareData = {
+          passwordId,
+          sharedByUserId: userId,
+          ...restData,
+          expiresAt: restData.expiresAt ? new Date(restData.expiresAt) : undefined
+        };
+
+        // If email is provided, try to find the user
+        if (sharedWithUserEmail) {
+          const targetUser = await storage.getUserByEmail(sharedWithUserEmail);
+          if (targetUser) {
+            shareData.sharedWithUserId = targetUser.id;
+          } else {
+            return res.status(404).json({ 
+              message: "User with this email not found. They need to create an account first." 
+            });
+          }
+        } else if (sharedWithUserId) {
+          shareData.sharedWithUserId = sharedWithUserId;
+        } else {
+          return res.status(400).json({ 
+            message: "Either sharedWithUserEmail or sharedWithUserId is required" 
+          });
+        }
+
+        // Verify user owns the password
+        const password = await storage.getPasswordById(passwordId, userId);
+        if (!password) {
+          return res.status(404).json({ message: "Password not found" });
+        }
+
+        const sharedPassword = await storage.sharePassword(shareData);
+
+        res.status(201).json(sharedPassword);
+		} catch (error) {
+			console.error("Error creating password share:", error);
+			return handleServerError(res, "Internal server error");
+		}
+	});
+
+	// Emergency Access
+	app.get("/api/emergency-contacts", isAuthenticated, async (req: Request, res: Response) => {
+		try {
+			const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const emergencyContacts = await storage.getEmergencyAccessByGrantor(userId);
+        res.json(emergencyContacts);
+		} catch (error) {
+			console.error("Error fetching emergency contacts:", error);
+			return handleServerError(res, "Internal server error");
+		}
+	});
+
+	app.post("/api/emergency-contacts", isAuthenticated, async (req: Request, res: Response) => {
+		try {
+			const userId = req.session.userId;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const result = emergencyAccessSchema.safeParse(req.body);
+        if (!result.success) {
+          return res.status(400).json({
+            message: result.error.errors[0].message,
+          });
+        }
+
+        const emergencyAccess = await storage.createEmergencyAccess({
+          grantorId: userId,
+          emergencyContactEmail: result.data.emergencyContactEmail,
+          accessLevel: result.data.accessLevel,
+          waitingPeriod: result.data.waitingPeriod
+        });
+
+        res.status(201).json(emergencyAccess);
+		} catch (error) {
+			console.error("Error creating emergency contact:", error);
+			return handleServerError(res, "Internal server error");
+		}
+	});
 
   app.post(
     "/api/security-alerts/:id/resolve",
@@ -543,23 +699,23 @@ app.get("/api/health", (req: Request, res: Response) => {
 });
 
   // ----- BROWSER EXTENSION ENDPOINTS -----
-  
+
   // Extension authentication endpoint
   app.post("/api/extension/auth", async (req: Request, res: Response) => {
     try {
       const { extensionId, userId } = req.body;
-      
+
       // Verify user is authenticated
       if (!req.session.userId || req.session.userId !== parseInt(userId)) {
         return res.status(401).json({ message: "User not authenticated" });
       }
-      
+
       // Generate extension token (store this in your database in production)
       const extensionToken = `ext_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+
       // In production, store this mapping: extensionToken -> userId
       // For now, we'll just return it
-      
+
       res.json({ 
         extensionToken,
         apiEndpoint: `${req.protocol}://${req.get('host')}/api`
@@ -569,30 +725,30 @@ app.get("/api/health", (req: Request, res: Response) => {
       return handleServerError(res, "Failed to authenticate extension");
     }
   });
-  
+
   // Extension password access (for autofill)
   app.get("/api/extension/passwords", async (req: Request, res: Response) => {
     try {
       const extensionToken = req.headers['x-extension-token'] as string;
       const domain = req.query.domain as string;
-      
+
       if (!extensionToken) {
         return res.status(401).json({ message: "Extension token required" });
       }
-      
+
       // In production, verify extensionToken and get userId
       // For demo, we'll use session if available
       if (!req.session.userId) {
         return res.status(401).json({ message: "Session expired" });
       }
-      
+
       const passwords = await storage.getPasswordsByUserId(req.session.userId);
-      
+
       // Filter passwords by domain if provided
       const filteredPasswords = domain 
         ? passwords.filter(p => p.website?.includes(domain))
         : passwords;
-      
+
       // Return only necessary fields for extension
       const extensionPasswords = filteredPasswords.map(p => ({
         id: p.id,
@@ -601,7 +757,7 @@ app.get("/api/health", (req: Request, res: Response) => {
         username: p.username,
         // Don't send encrypted password - extension should request it separately
       }));
-      
+
       res.json(extensionPasswords);
     } catch (error) {
       console.error("Extension get passwords error:", error);
@@ -726,7 +882,7 @@ app.get("/api/health", (req: Request, res: Response) => {
 
         // Handle both old schema and email-based sharing
         const { sharedWithUserEmail, sharedWithUserId, ...restData } = req.body;
-        
+
         let shareData = {
           passwordId,
           sharedByUserId: userId,

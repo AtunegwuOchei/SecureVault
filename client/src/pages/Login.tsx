@@ -61,15 +61,26 @@ const Login: React.FC = () => {
   const { isSupported: biometricSupported, isEnabled: biometricEnabled, authenticateWithBiometric } = useBiometric();
 
   const handleBiometricLogin = async () => {
-    // setIsLoading(true); // Assuming setIsLoading exists and is a state update function. It's not used in the original code.
-    // setError(""); // Assuming setError exists and is a state update function. It's not used in the original code.
+    setError("");
 
     try {
-      const username = await authenticateWithBiometric();
-      if (username) {
-        // For biometric login, we'll need to modify the auth system
-        // For now, we'll just redirect to a special flow
-        setLocation("/");
+      const result = await authenticateWithBiometric();
+      if (result) {
+        // Fetch user data after successful biometric authentication
+        const userResponse = await fetch('/api/auth/me', {
+          credentials: 'include'
+        });
+        
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          toast({
+            title: "Login successful",
+            description: "Welcome back!",
+          });
+          setLocation("/");
+        } else {
+          throw new Error('Failed to fetch user data');
+        }
       }
     } catch (err: any) {
       toast({
@@ -77,8 +88,6 @@ const Login: React.FC = () => {
         description: err.message || "Could not authenticate with biometrics",
         variant: "destructive",
       });
-    } finally {
-      // setIsLoading(false);
     }
   };
 

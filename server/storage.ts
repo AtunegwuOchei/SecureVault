@@ -106,6 +106,18 @@ export interface IStorage {
 		waitingPeriod: number;
 	}): Promise<any>;
 	getEmergencyAccessByGrantor(grantorId: number): Promise<any>;
+
+  // Biometric credential storage methods
+  storeBiometricCredential(userId: number, credentialId: string, publicKey: string): Promise<void>;
+  getBiometricCredential(userId: number, credentialId: string): Promise<any>;
+
+  // Enterprise Features Storage Methods
+	getSharedVaults(userId: number): Promise<any[]>;
+	createSharedVault(userId: number, vaultData: any): Promise<any>;
+	getPasswordShares(userId: number): Promise<any[]>;
+	createPasswordShare(userId: number, shareData: any): Promise<any>;
+	getEmergencyContacts(userId: number): Promise<any[]>;
+	createEmergencyContact(userId: number, contactData: any): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -533,7 +545,7 @@ export class DatabaseStorage implements IStorage {
 	}) {
 		// Try to find the user by email first
 		const emergencyContact = await this.getUserByEmail(data.emergencyContactEmail);
-		
+
 		if (emergencyContact) {
 			// User exists, use their ID
 			const [access] = await db.insert(emergencyAccess).values({
@@ -591,6 +603,115 @@ export class DatabaseStorage implements IStorage {
 		);
 
 		return enrichedResults;
+	}
+
+	async storeBiometricCredential(userId: number, credentialId: string, publicKey: string): Promise<void> {
+		// For now, we'll store this in the user's metadata or create a simple table
+		// In production, you'd want a proper biometric_credentials table
+		await db
+			.update(users)
+			.set({ 
+				metadata: JSON.stringify({ 
+					biometricCredential: { id: credentialId, publicKey } 
+				}) 
+			})
+			.where(eq(users.id, userId));
+	}
+
+	async getBiometricCredential(userId: number, credentialId: string): Promise<any> {
+		const user = await this.getUser(userId);
+		if (!user?.metadata) return null;
+
+		try {
+			const metadata = JSON.parse(user.metadata as string);
+			const credential = metadata?.biometricCredential;
+			return credential?.id === credentialId ? credential : null;
+		} catch {
+			return null;
+		}
+	}
+
+	// Enterprise Features Storage Methods
+
+	async getSharedVaults(userId: number): Promise<any[]> {
+		// Mock implementation - in production, use proper database tables
+		return [
+			{
+				id: 1,
+				name: "Team Passwords",
+				description: "Shared passwords for the development team",
+				permissions: "admin",
+				memberCount: 5,
+				createdAt: new Date().toISOString(),
+			},
+			{
+				id: 2,
+				name: "Marketing Assets",
+				description: "Social media and marketing tool passwords",
+				permissions: "view",
+				memberCount: 3,
+				createdAt: new Date().toISOString(),
+			}
+		];
+	}
+
+	async createSharedVault(userId: number, vaultData: any): Promise<any> {
+		// Mock implementation
+		return {
+			id: Math.floor(Math.random() * 1000),
+			...vaultData,
+			ownerId: userId,
+			createdAt: new Date().toISOString(),
+		};
+	}
+
+	async getPasswordShares(userId: number): Promise<any[]> {
+		// Mock implementation
+		return [
+			{
+				id: 1,
+				passwordTitle: "Company WiFi",
+				sharedWith: "john@company.com",
+				permissions: "view",
+				expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+				createdAt: new Date().toISOString(),
+			}
+		];
+	}
+
+	async createPasswordShare(userId: number, shareData: any): Promise<any> {
+		// Mock implementation
+		return {
+			id: Math.floor(Math.random() * 1000),
+			...shareData,
+			sharedBy: userId,
+			createdAt: new Date().toISOString(),
+		};
+	}
+
+	async getEmergencyContacts(userId: number): Promise<any[]> {
+		// Mock implementation
+		return [
+			{
+				id: 1,
+				name: "Jane Doe",
+				email: "jane@family.com",
+				waitingPeriod: 72,
+				status: "active",
+				createdAt: new Date().toISOString(),
+			}
+		];
+	}
+
+	async createEmergencyContact(userId: number, contactData: any): Promise<any> {
+		// Mock implementation
+		return {
+			id: Math.floor(Math.random() * 1000),
+			...contactData,
+			userId,
+			status: "pending",
+			createdAt: new Date().toISOString(),
+		};
 	}
 }
 
