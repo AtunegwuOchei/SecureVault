@@ -10,7 +10,7 @@ import PasswordGenerator from "@/components/common/PasswordGenerator";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useBiometric } from "@/hooks/use-biometric";
-import { BiometricSetup } from "@/components/auth/BiometricSetup";
+import BiometricSetup from "@/components/auth/BiometricSetup";
 
 const Dashboard: React.FC = () => {
   // Fetch current user
