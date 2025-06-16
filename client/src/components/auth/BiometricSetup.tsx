@@ -10,9 +10,10 @@ import { useToast } from '@/hooks/use-toast';
 interface BiometricSetupProps {
   onComplete?: () => void;
   onSkip?: () => void;
+  onClose?: () => void;
 }
 
-const BiometricSetup: React.FC<BiometricSetupProps> = ({ onComplete, onSkip }) => {
+const BiometricSetup: React.FC<BiometricSetupProps> = ({ onComplete, onSkip, onClose }) => {
   const { user } = useAuth();
   const { isSupported, isEnabled, isLoading, setupBiometric, disableBiometric } = useBiometric();
   const { toast } = useToast();
@@ -72,8 +73,8 @@ const BiometricSetup: React.FC<BiometricSetupProps> = ({ onComplete, onSkip }) =
               You can still use your password to log in securely.
             </AlertDescription>
           </Alert>
-          {onSkip && (
-            <Button onClick={onSkip} className="w-full mt-4">
+          {(onSkip || onClose) && (
+            <Button onClick={onSkip || onClose} className="w-full mt-4">
               Continue
             </Button>
           )}
@@ -140,8 +141,8 @@ const BiometricSetup: React.FC<BiometricSetupProps> = ({ onComplete, onSkip }) =
             </div>
           </div>
           <div className="flex space-x-2">
-            {onSkip && (
-              <Button onClick={onSkip} variant="outline" className="flex-1">
+            {(onSkip || onClose) && (
+              <Button onClick={onSkip || onClose} variant="outline" className="flex-1">
                 Skip for Now
               </Button>
             )}

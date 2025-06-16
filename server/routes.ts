@@ -557,16 +557,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 			const userId = req.session.userId;
         if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-        const passwordId = parseInt(req.params.id);
-        if (isNaN(passwordId)) {
-          return res.status(400).json({ message: "Invalid password ID" });
+        // Handle both old schema and email-based sharing
+        const { passwordId, sharedWithUserEmail, sharedWithUserId, ...restData } = req.body;
+
+        if (!passwordId || isNaN(parseInt(passwordId))) {
+          return res.status(400).json({ message: "Valid password ID is required" });
         }
 
-        // Handle both old schema and email-based sharing
-        const { sharedWithUserEmail, sharedWithUserId, ...restData } = req.body;
-
         let shareData = {
-          passwordId,
+          passwordId: parseInt(passwordId),
           sharedByUserId: userId,
           ...restData,
           expiresAt: restData.expiresAt ? new Date(restData.expiresAt) : undefined
@@ -591,7 +590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Verify user owns the password
-        const password = await storage.getPasswordById(passwordId, userId);
+        const password = await storage.getPasswordById(shareData.passwordId, userId);
         if (!password) {
           return res.status(404).json({ message: "Password not found" });
         }

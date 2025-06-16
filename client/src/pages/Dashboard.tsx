@@ -52,10 +52,10 @@ const Dashboard: React.FC = () => {
   React.useEffect(() => {
     // Show biometric setup dialog for supported devices that haven't set it up
     const hasSeenBiometricPrompt = localStorage.getItem('biometric_prompt_shown');
-    if (biometricSupported && !biometricEnabled && !hasSeenBiometricPrompt) {
+    if (biometricSupported && !biometricEnabled && !hasSeenBiometricPrompt && userData?.user) {
       setShowBiometricSetup(true);
     }
-  }, [biometricSupported, biometricEnabled]);
+  }, [biometricSupported, biometricEnabled, userData]);
 
   return (
     <>

@@ -631,39 +631,8 @@ export class DatabaseStorage implements IStorage {
 		}
 	}
 
-	// Enterprise Features Storage Methods
-
-	async getSharedVaults(userId: number): Promise<any[]> {
-		// Mock implementation - in production, use proper database tables
-		return [
-			{
-				id: 1,
-				name: "Team Passwords",
-				description: "Shared passwords for the development team",
-				permissions: "admin",
-				memberCount: 5,
-				createdAt: new Date().toISOString(),
-			},
-			{
-				id: 2,
-				name: "Marketing Assets",
-				description: "Social media and marketing tool passwords",
-				permissions: "view",
-				memberCount: 3,
-				createdAt: new Date().toISOString(),
-			}
-		];
-	}
-
-	async createSharedVault(userId: number, vaultData: any): Promise<any> {
-		// Mock implementation
-		return {
-			id: Math.floor(Math.random() * 1000),
-			...vaultData,
-			ownerId: userId,
-			createdAt: new Date().toISOString(),
-		};
-	}
+	// Enterprise Features Storage Methods - Remove mock implementations
+	// The real implementations are above in the main storage methods
 
 	async getPasswordShares(userId: number): Promise<any[]> {
 		// Mock implementation

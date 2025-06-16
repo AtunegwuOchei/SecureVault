@@ -55,7 +55,7 @@ const PasswordSharing: React.FC = () => {
 
   const sharePasswordMutation = useMutation({
     mutationFn: async (shareData: any) => {
-      const response = await fetch(`/api/passwords/${shareData.passwordId}/share`, {
+      const response = await fetch('/api/password-shares', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(shareData),
@@ -100,7 +100,7 @@ const PasswordSharing: React.FC = () => {
     }
 
     const shareData = {
-      passwordId: parseInt(shareForm.passwordId),
+      passwordId: shareForm.passwordId,
       sharedWithUserEmail: shareForm.sharedWithUserEmail,
       permissions: shareForm.permissions,
       ...(shareForm.expiresAt && { expiresAt: shareForm.expiresAt })
