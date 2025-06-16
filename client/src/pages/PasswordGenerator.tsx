@@ -155,7 +155,13 @@ const PasswordGenerator: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Password Generator</h1>
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Password Generator</h1>
+      
+      <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <p className="text-sm text-blue-800 dark:text-blue-200">
+          <strong>Note:</strong> Passwords generated in this app do not automatically change existing site passwords. You'll need to manually update your passwords on websites with existing accounts.
+        </p>
+      </div>
       
       <Card className="mb-8">
         <CardHeader>
