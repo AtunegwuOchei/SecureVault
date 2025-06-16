@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Globe, Download, Shield, Key, Zap, ArrowLeft, Chrome, Firefox, Monitor } from 'lucide-react';
+import { Globe, Download, Shield, Key, Zap, ArrowLeft } from 'lucide-react';
 import { Link } from 'wouter';
 
 const BrowserExtension: React.FC = () => {
@@ -74,7 +74,7 @@ const BrowserExtension: React.FC = () => {
         <Card className="text-center">
           <CardHeader>
             <div className="flex justify-center mb-2">
-              <Chrome className="h-8 w-8 text-blue-500" />
+              <Globe className="h-8 w-8 text-blue-500" />
             </div>
             <CardTitle>Chrome Extension</CardTitle>
             <CardDescription>
@@ -95,7 +95,7 @@ const BrowserExtension: React.FC = () => {
         <Card className="text-center">
           <CardHeader>
             <div className="flex justify-center mb-2">
-              <Firefox className="h-8 w-8 text-orange-500" />
+              <Globe className="h-8 w-8 text-orange-500" />
             </div>
             <CardTitle>Firefox Add-on</CardTitle>
             <CardDescription>
@@ -116,7 +116,7 @@ const BrowserExtension: React.FC = () => {
         <Card className="text-center">
           <CardHeader>
             <div className="flex justify-center mb-2">
-              <Monitor className="h-8 w-8 text-blue-600" />
+              <Globe className="h-8 w-8 text-blue-600" />
             </div>
             <CardTitle>Edge Extension</CardTitle>
             <CardDescription>
