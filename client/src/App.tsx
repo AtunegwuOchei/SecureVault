@@ -20,8 +20,10 @@ import Register from "@/pages/Register";
 import BreachAlerts from "@/pages/BreachAlerts";
 import PasswordHealth from "@/pages/PasswordHealth";
 import SyncSettings from "@/pages/SyncSettings";
-import HelpSupport from "./pages/HelpSupport";
-import EnterpriseFeatures from "./pages/EnterpriseFeatures";
+import HelpSupport from "@/pages/HelpSupport";
+import BiometricSetupPage from "@/pages/BiometricSetup";
+import BrowserExtension from "@/pages/BrowserExtension";
+import EnterpriseFeatures from "@/pages/EnterpriseFeatures";
 import SharedVaultsPage from "@/pages/SharedVaults";
 import PasswordSharingPage from "@/pages/PasswordSharing";
 import EmergencyAccessPage from "@/pages/EmergencyAccess";
@@ -149,6 +151,22 @@ function Router() {
         {isAuthPage ? null : (
           <MainLayout>
             <EmergencyAccessPage />
+          </MainLayout>
+        )}
+      </Route>
+
+      <Route path="/biometric-setup">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <BiometricSetupPage />
+          </MainLayout>
+        )}
+      </Route>
+
+      <Route path="/extension">
+        {isAuthPage ? null : (
+          <MainLayout>
+            <BrowserExtension />
           </MainLayout>
         )}
       </Route>

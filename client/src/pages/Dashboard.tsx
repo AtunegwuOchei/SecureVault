@@ -10,6 +10,7 @@ import PasswordGenerator from "@/components/common/PasswordGenerator";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useBiometric } from "@/hooks/use-biometric";
+import { useToast } from "@/hooks/use-toast";
 import BiometricSetup from "@/components/auth/BiometricSetup";
 
 const Dashboard: React.FC = () => {
@@ -41,12 +42,13 @@ const Dashboard: React.FC = () => {
     ))) : 0;
 
     const { logout } = useAuth();
+    const { toast } = useToast();
 
     const handleLogout = async () => {
       await logout();
     };
 
-  const { isSupported: biometricSupported, isEnabled: biometricEnabled } = useBiometric();
+  const { isSupported: biometricSupported, isEnabled: biometricEnabled, setupBiometric, isLoading: biometricLoading } = useBiometric();
   const [showBiometricSetup, setShowBiometricSetup] = React.useState(false);
 
   React.useEffect(() => {
@@ -56,6 +58,26 @@ const Dashboard: React.FC = () => {
       setShowBiometricSetup(true);
     }
   }, [biometricSupported, biometricEnabled, userData]);
+
+  const handleEnableBiometric = async () => {
+    if (!userData?.user?.username) return;
+    
+    try {
+      const success = await setupBiometric(userData.user.username);
+      if (success) {
+        toast({
+          title: "Success",
+          description: "Biometric authentication has been set up successfully!",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Setup Failed",
+        description: error.message || "Failed to set up biometric authentication",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <>

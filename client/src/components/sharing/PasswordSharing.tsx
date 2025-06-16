@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -155,7 +154,7 @@ const PasswordSharing: React.FC = () => {
             Manage passwords shared with you and by you
           </p>
         </div>
-        
+
         <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -186,7 +185,7 @@ const PasswordSharing: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div>
                 <Label htmlFor="userEmail">User Email</Label>
                 <Input
@@ -197,7 +196,7 @@ const PasswordSharing: React.FC = () => {
                   placeholder="Enter user's email address"
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="permissions">Permissions</Label>
                 <Select
@@ -214,7 +213,7 @@ const PasswordSharing: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div>
                 <Label htmlFor="expiresAt">Expires At (Optional)</Label>
                 <Input
@@ -224,7 +223,7 @@ const PasswordSharing: React.FC = () => {
                   onChange={(e) => setShareForm(prev => ({ ...prev, expiresAt: e.target.value }))}
                 />
               </div>
-              
+
               <div className="flex space-x-2">
                 <Button
                   onClick={() => setIsShareDialogOpen(false)}

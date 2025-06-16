@@ -87,6 +87,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, isMobile, onClose, user })
           label: "Help & Support",
           icon: <Info className="h-5 w-5 mr-3" />,
           path: "/help"
+        },
+        {
+          label: "Biometric Setup",
+          icon: <Smartphone className="h-5 w-5 mr-3" />,
+          path: "/biometric-setup"
         }
       ]
     },
