@@ -14,7 +14,7 @@ const BrowserExtension: React.FC<BrowserExtensionProps> = ({ onConnect }) => {
     // Listen for messages from the browser extension
     const handleExtensionMessage = (event: MessageEvent) => {
       // Verify origin is your extension Repl - replace with your actual extension Repl URL
-      if (event.origin !== 'https://6f84aed6-d40a-4aab-8341-06a994d1b022-00-2qwj62h3vdsa0.spock.replit.dev') return;
+      if (event.origin !== 'https://6db84f58-494c-45de-8ef1-179bf982161e-00-2byu5578dzcbg.janeway.replit.dev/') return;
 
       if (event.data.type === 'EXTENSION_CONNECT_REQUEST') {
         // Send authentication token or user ID to extension
@@ -39,7 +39,7 @@ const BrowserExtension: React.FC<BrowserExtensionProps> = ({ onConnect }) => {
 
     // Open extension connection window
     const extensionWindow = window.open(
-      'https://6f84aed6-d40a-4aab-8341-06a994d1b022-00-2qwj62h3vdsa0.spock.replit.dev/connect', 
+      'https://6db84f58-494c-45de-8ef1-179bf982161e-00-2byu5578dzcbg.janeway.replit.dev/connect', 
       'extension-connect',
       'width=500,height=600'
     );
@@ -55,7 +55,7 @@ const BrowserExtension: React.FC<BrowserExtensionProps> = ({ onConnect }) => {
 
   const handleInstallExtension = () => {
     // Open your actual browser extension Repl
-    window.open('https://6f84aed6-d40a-4aab-8341-06a994d1b022-00-2qwj62h3vdsa0.spock.replit.dev/', '_blank');
+    window.open('https://6db84f58-494c-45de-8ef1-179bf982161e-00-2byu5578dzcbg.janeway.replit.dev/', '_blank');
 
     toast({
       title: "Extension installation",
