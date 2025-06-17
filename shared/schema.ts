@@ -258,6 +258,7 @@ export const emergencyAccessSchema = z.object({
 	waitingPeriod: z.number().min(1).max(30).default(7),
 });
 
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
