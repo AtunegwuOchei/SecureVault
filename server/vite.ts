@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
-import viteConfig from "../vite.config";
+import viteConfig from "../vite.config"; // Import the full vite config
 import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
@@ -19,16 +19,23 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-export async function setupVite(app: Express, server: Server) {
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: { server },
-    allowedHosts: true,
-  };
-
+export async function setupVite(app: Express, _server: Server) {
   const vite = await createViteServer({
+    // IMPORTANT: Spread the entire viteConfig first.
+    // This brings in all plugins, resolve aliases, root, build, etc.
     ...viteConfig,
-    configFile: false,
+
+    // Then, explicitly override or merge the 'server' options.
+    // This ensures your specific server settings (middlewareMode, hmr)
+    // are applied, potentially overriding what's in viteConfig if needed.
+    server: {
+      ...(viteConfig.server || {}), // Merge existing server config from vite.config.ts
+      middlewareMode: true, // Keep this explicit
+      // Explicitly set hmr to an object with clientPort: null to disable client-side WS connection
+      hmr: {
+        clientPort: null, // This tells Vite's client not to try connecting via WebSocket
+      },
+    },
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {
@@ -36,8 +43,9 @@ export async function setupVite(app: Express, server: Server) {
         process.exit(1);
       },
     },
-    server: serverOptions,
     appType: "custom",
+    // No need to explicitly pass root and build here if they are in viteConfig
+    // as ...viteConfig already includes them.
   });
 
   app.use(vite.middlewares);

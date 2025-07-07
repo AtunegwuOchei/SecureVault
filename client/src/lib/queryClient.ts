@@ -1,3 +1,4 @@
+// client/lib/queryClient.ts
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
@@ -13,7 +14,14 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   // Optional base URL (e.g., from environment variables)
+  // This should now be undefined or "" if VITE_API_BASE_URL is removed from .env
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+
+  // DEBUGGING LOGS: Verify what baseUrl resolves to
+  console.log("DEBUG: VITE_API_BASE_URL raw:", import.meta.env.VITE_API_BASE_URL);
+  console.log("DEBUG: Resolved baseUrl for apiRequest:", baseUrl);
+
+  // If baseUrl is empty, fullUrl will be a relative path (e.g., /api/passwords)
   const fullUrl = url.startsWith("http") ? url : `${baseUrl}${url}`;
 
   console.log("📡 API Request →", {
@@ -47,7 +55,17 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
+    // This part also needs to respect the baseUrl logic
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+    const fullUrl = (queryKey[0] as string).startsWith("http") ? (queryKey[0] as string) : `${baseUrl}${queryKey[0]}`;
+
+    // DEBUGGING LOGS: Verify what baseUrl resolves to for getQueryFn
+    console.log("DEBUG: VITE_API_BASE_URL raw (getQueryFn):", import.meta.env.VITE_API_BASE_URL);
+    console.log("DEBUG: Resolved baseUrl for getQueryFn:", baseUrl);
+    console.log("DEBUG: Full URL for getQueryFn:", fullUrl);
+
+
+    const res = await fetch(fullUrl, { // Use fullUrl here
       credentials: "include",
     });
 

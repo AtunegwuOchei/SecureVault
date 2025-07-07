@@ -1,6 +1,7 @@
+// server/routes.ts
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage } from "./storage"; // Assuming storage.ts exists and has necessary functions
 import {
   configureSession,
   isAuthenticated,
@@ -487,31 +488,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ----- SECURITY ALERTS ROUTES -----
     app.get("/api/security-alerts", isAuthenticated, async (req: Request, res: Response) => {
-		try {
-			const alerts = await storage.getSecurityAlertsByUserId(req.session.userId!);
-			res.json(alerts);
-		} catch (error) {
-			console.error("Error fetching security alerts:", error);
-			return handleServerError(res, "Internal server error");
-		}
-	});
+    try {
+      const alerts = await storage.getSecurityAlertsByUserId(req.session.userId!);
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching security alerts:", error);
+      return handleServerError(res, "Internal server error");
+    }
+  });
 
-	// Enterprise Features Routes
+  // Enterprise Features Routes
 
-	// Shared Vaults
-	app.get("/api/shared-vaults", isAuthenticated, async (req: Request, res: Response) => {
-		try {
-			const vaults = await storage.getSharedVaultsForUser(req.session.userId!);
-			res.json(vaults);
-		} catch (error) {
-			console.error("Error fetching shared vaults:", error);
-			return handleServerError(res, "Internal server error");
-		}
-	});
+  // Shared Vaults
+  app.get("/api/shared-vaults", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const vaults = await storage.getSharedVaultsForUser(req.session.userId!);
+      res.json(vaults);
+    } catch (error) {
+      console.error("Error fetching shared vaults:", error);
+      return handleServerError(res, "Internal server error");
+    }
+  });
 
-	app.post("/api/shared-vaults", isAuthenticated, async (req: Request, res: Response) => {
-		try {
-			const userId = req.session.userId;
+  app.post("/api/shared-vaults", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
         if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
         const result = createSharedVaultSchema.safeParse(req.body);
@@ -527,16 +528,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         res.status(201).json(vault);
-		} catch (error) {
-			console.error("Error creating shared vault:", error);
-			return handleServerError(res, "Internal server error");
-		}
-	});
+    } catch (error) {
+      console.error("Error creating shared vault:", error);
+      return handleServerError(res, "Internal server error");
+    }
+  });
 
-	// Password Sharing
-	app.get("/api/password-shares", isAuthenticated, async (req: Request, res: Response) => {
-		try {
-			const userId = req.session.userId;
+  // Password Sharing
+  app.get("/api/password-shares", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
         if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
         const sharedWithMe = await storage.getSharedPasswordsForUser(userId);
@@ -546,15 +547,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sharedWithMe,
           sharedByMe
         });
-		} catch (error) {
-			console.error("Error fetching password shares:", error);
-			return handleServerError(res, "Internal server error");
-		}
-	});
+    } catch (error) {
+      console.error("Error fetching password shares:", error);
+      return handleServerError(res, "Internal server error");
+    }
+  });
 
-	app.post("/api/password-shares", isAuthenticated, async (req: Request, res: Response) => {
-		try {
-			const userId = req.session.userId;
+  app.post("/api/password-shares", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
         if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
         // Handle both old schema and email-based sharing
@@ -598,29 +599,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sharedPassword = await storage.sharePassword(shareData);
 
         res.status(201).json(sharedPassword);
-		} catch (error) {
-			console.error("Error creating password share:", error);
-			return handleServerError(res, "Internal server error");
-		}
-	});
+    } catch (error) {
+      console.error("Error creating password share:", error);
+      return handleServerError(res, "Internal server error");
+    }
+  });
 
-	// Emergency Access
-	app.get("/api/emergency-contacts", isAuthenticated, async (req: Request, res: Response) => {
-		try {
-			const userId = req.session.userId;
+  // Emergency Access
+  app.get("/api/emergency-contacts", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
         if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
         const emergencyContacts = await storage.getEmergencyAccessByGrantor(userId);
         res.json(emergencyContacts);
-		} catch (error) {
-			console.error("Error fetching emergency contacts:", error);
-			return handleServerError(res, "Internal server error");
-		}
-	});
+    } catch (error) {
+      console.error("Error fetching emergency contacts:", error);
+      return handleServerError(res, "Internal server error");
+    }
+  });
 
-	app.post("/api/emergency-contacts", isAuthenticated, async (req: Request, res: Response) => {
-		try {
-			const userId = req.session.userId;
+  app.post("/api/emergency-contacts", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
         if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
         const result = emergencyAccessSchema.safeParse(req.body);
@@ -638,11 +639,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         res.status(201).json(emergencyAccess);
-		} catch (error) {
-			console.error("Error creating emergency contact:", error);
-			return handleServerError(res, "Internal server error");
-		}
-	});
+    } catch (error) {
+      console.error("Error creating emergency contact:", error);
+      return handleServerError(res, "Internal server error");
+    }
+  });
 
   app.post(
     "/api/security-alerts/:id/resolve",
@@ -699,7 +700,7 @@ app.get("/api/health", (req: Request, res: Response) => {
 
   // ----- BROWSER EXTENSION ENDPOINTS -----
 
-  // Extension authentication endpoint
+  // Extension authentication endpoint (already exists, but note for future)
   app.post("/api/extension/auth", async (req: Request, res: Response) => {
     try {
       const { extensionId, userId } = req.body;
@@ -745,16 +746,16 @@ app.get("/api/health", (req: Request, res: Response) => {
 
       // Filter passwords by domain if provided
       const filteredPasswords = domain 
-        ? passwords.filter(p => p.website?.includes(domain))
+        ? passwords.filter(p => p.url?.includes(domain)) // Changed 'website' to 'url' based on schema.ts
         : passwords;
 
       // Return only necessary fields for extension
       const extensionPasswords = filteredPasswords.map(p => ({
         id: p.id,
         title: p.title,
-        website: p.website,
+        url: p.url, // Changed 'website' to 'url'
         username: p.username,
-        // Don't send encrypted password - extension should request it separately
+        encryptedPassword: p.encryptedPassword // Include encrypted password for client-side decryption
       }));
 
       res.json(extensionPasswords);
@@ -763,6 +764,53 @@ app.get("/api/health", (req: Request, res: Response) => {
       return handleServerError(res, "Failed to get passwords for extension");
     }
   });
+
+  // NEW: Extension Sync Data Endpoint
+  app.post( // Changed to POST to allow body for lastSyncTimestamp
+    "/api/extension/sync-data",
+    isAuthenticated, // Ensure only authenticated users can sync
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.session.userId;
+        if (!userId) {
+          // This should ideally be caught by isAuthenticated, but as a safeguard
+          return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const lastSyncTimestamp = req.body.lastSyncTimestamp ? new Date(req.body.lastSyncTimestamp as string) : undefined;
+
+        // Fetch updated passwords
+        const updatedPasswords = await storage.getUpdatedPasswordsByUserId(userId, lastSyncTimestamp);
+
+        // Fetch updated settings (placeholder - assuming a settings model with updatedAt)
+        const updatedUserSettings = await storage.getUpdatedUserSettingsByUserId(userId, lastSyncTimestamp);
+
+        // Get current server time for the next sync
+        const serverTime = new Date().toISOString();
+
+        res.json({
+          updatedPasswords: updatedPasswords.map(p => ({
+            id: p.id,
+            title: p.title,
+            username: p.username,
+            encryptedPassword: p.encryptedPassword,
+            url: p.url,
+            notes: p.notes,
+            category: p.category,
+            isFavorite: p.isFavorite,
+            createdAt: p.createdAt,
+            updatedAt: p.updatedAt,
+            strength: p.strength,
+          })),
+          updatedUserSettings: updatedUserSettings, // Assuming settings are returned as-is
+          serverTime: serverTime,
+        });
+      } catch (error) {
+        console.error("Extension sync data error:", error);
+        return handleServerError(res, "Failed to sync data with extension");
+      }
+    }
+  );
 
   // ----- PASSWORD GENERATOR -----
   app.post(
