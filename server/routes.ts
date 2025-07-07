@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage"; // Assuming storage.ts exists and has necessary functions
 import {
   configureSession,
-  isAuthenticated,
+  isAuthenticated, // <-- This middleware will now be solely responsible for extension auth
   login,
   register,
   logout,
@@ -388,12 +388,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
         const passwordId = parseInt(req.params.id);
+        console.log(`[Server] PUT /api/passwords/${passwordId} - User ID: ${userId}, Body:`, req.body); // Debug log
         if (isNaN(passwordId) || passwordId <= 0) {
           return res.status(400).json({ message: "Invalid password ID" });
         }
 
         const result = updatePasswordSchema.safeParse(req.body);
         if (!result.success) {
+          console.error(`[Server] Update Password Validation Error:`, result.error.errors); // Debug log
           return res.status(400).json({
             message: result.error.errors[0].message,
           });
@@ -413,6 +415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
         if (!updatedPassword) {
+          console.warn(`[Server] Password not found for update: ID ${passwordId}, User ID ${userId}`); // Debug log
           return res.status(404).json({ message: "Password not found" });
         }
 
@@ -442,12 +445,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
         const passwordId = parseInt(req.params.id);
+        console.log(`[Server] DELETE /api/passwords/${passwordId} - User ID: ${userId}`); // Debug log
         if (isNaN(passwordId) || passwordId <= 0) {
           return res.status(400).json({ message: "Invalid password ID" });
         }
 
         const success = await storage.deletePassword(passwordId, userId);
         if (!success) {
+          console.warn(`[Server] Password not found for deletion: ID ${passwordId}, User ID ${userId}`); // Debug log
           return res.status(404).json({ message: "Password not found" });
         }
 
@@ -727,36 +732,30 @@ app.get("/api/health", (req: Request, res: Response) => {
   });
 
   // Extension password access (for autofill)
-  app.get("/api/extension/passwords", async (req: Request, res: Response) => {
+  // NOW PROTECTED SOLELY BY isAuthenticated MIDDLEWARE
+  app.get("/api/extension/passwords", isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const extensionToken = req.headers['x-extension-token'] as string;
       const domain = req.query.domain as string;
+      console.log(`[Server] GET /api/extension/passwords?domain=${domain} - User ID: ${req.session.userId}`); // Debug log
 
-      if (!extensionToken) {
-        return res.status(401).json({ message: "Extension token required" });
-      }
+      const userId = req.session.userId!;
 
-      // In production, verify extensionToken and get userId
-      // For demo, we'll use session if available
-      if (!req.session.userId) {
-        return res.status(401).json({ message: "Session expired" });
-      }
-
-      const passwords = await storage.getPasswordsByUserId(req.session.userId);
+      const passwords = await storage.getPasswordsByUserId(userId);
 
       // Filter passwords by domain if provided
       const filteredPasswords = domain 
-        ? passwords.filter(p => p.url?.includes(domain)) // Changed 'website' to 'url' based on schema.ts
+        ? passwords.filter(p => p.url && new URL(p.url).hostname.includes(domain)) 
         : passwords;
 
       // Return only necessary fields for extension
       const extensionPasswords = filteredPasswords.map(p => ({
         id: p.id,
         title: p.title,
-        url: p.url, // Changed 'website' to 'url'
+        url: p.url, 
         username: p.username,
-        encryptedPassword: p.encryptedPassword // Include encrypted password for client-side decryption
+        password: p.encryptedPassword // <-- CHANGED THIS LINE: Renamed encryptedPassword to password
       }));
+      console.log(`[Server] Found ${extensionPasswords.length} passwords for domain ${domain}.`); // Debug log
 
       res.json(extensionPasswords);
     } catch (error) {
@@ -778,6 +777,7 @@ app.get("/api/health", (req: Request, res: Response) => {
         }
 
         const lastSyncTimestamp = req.body.lastSyncTimestamp ? new Date(req.body.lastSyncTimestamp as string) : undefined;
+        console.log(`[Server] POST /api/extension/sync-data - User ID: ${userId}, Last Sync: ${lastSyncTimestamp}`); // Debug log
 
         // Fetch updated passwords
         const updatedPasswords = await storage.getUpdatedPasswordsByUserId(userId, lastSyncTimestamp);
@@ -1034,7 +1034,7 @@ app.get("/api/health", (req: Request, res: Response) => {
         res.status(201).json(vault);
       } catch (error) {
         console.error("Create shared vault error:", error);
-        return handleServerError(res, "Failed to create shared vault");
+        return handleServerError(res, "Internal server error");
       }
     }
   );
@@ -1135,18 +1135,17 @@ app.get("/api/health", (req: Request, res: Response) => {
         });
 
         res.status(201).json(emergencyAccess);
-      } catch (error) {
-        console.error("Create emergency access error:", error);
-        return handleServerError(res, "Failed to create emergency access");
-      }
+    } catch (error) {
+      console.error("Create emergency access error:", error);
+      return handleServerError(res, "Internal server error");
     }
-  );
+  });
 
   // Add CORS headers middleware if needed
   app.use((req: Request, res: Response, next: NextFunction) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Extension-Token'); // X-Extension-Token already added
 
     if (req.method === 'OPTIONS') {
       res.sendStatus(200);

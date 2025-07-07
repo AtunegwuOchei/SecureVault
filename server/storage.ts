@@ -1,4 +1,3 @@
-// server/storage.ts
 import { eq, and, desc, sql, gt } from "drizzle-orm";
 import { db } from "./db";
 import {
@@ -657,14 +656,21 @@ export class DatabaseStorage implements IStorage {
 
 	// NEW: Get updated user settings for polling
 	async getUpdatedUserSettingsByUserId(userId: number, lastSyncTimestamp?: Date): Promise<User | undefined> {
+		// This query needs to be structured carefully.
+		// If 'users' table has an 'updatedAt' column, you can filter by it.
+		// Otherwise, you might need to fetch the user and then decide if their 'settings'
+		// (assuming they are a JSONB column or similar) have conceptually changed.
+
 		let query = db
 			.select()
 			.from(users)
 			.where(eq(users.id, userId))
 			.$dynamic(); // Enable dynamic WHERE clause
 
+		// Only apply the timestamp filter if the 'users' table actually has an 'updated_at' column.
+		// If it doesn't, this part would cause the "syntax error at or near ">"".
+		// Assuming 'users' table has 'updatedAt' column as per previous discussion.
 		if (lastSyncTimestamp) {
-			// Assuming 'users' table has an 'updatedAt' column
 			query = query.where(gt(users.updatedAt, lastSyncTimestamp));
 		}
 

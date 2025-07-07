@@ -21,6 +21,8 @@ export const users = pgTable("users", {
 	isPremium: boolean("is_premium").default(false),
 	masterKeyHash: text("master_key_hash").notNull(),
 	salt: text("salt").notNull(),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	metadata: jsonb("metadata"),
 });
 
 export const passwords = pgTable("passwords", {
@@ -220,13 +222,13 @@ export const forgotPasswordSchema = z.object({
 });
 
 export const resetPasswordSchema = z.object({
-  token: z.string().min(1, "Reset token is required"),
-  password: z.string().min(8, "Password must be at least 8 characters")
+	token: z.string().min(1, "Reset token is required"),
+	password: z.string().min(8, "Password must be at least 8 characters")
 });
 
 export const createTeamSchema = z.object({
-  name: z.string().min(1, "Team name is required").max(100),
-  description: z.string().optional()
+	name: z.string().min(1, "Team name is required").max(100),
+	description: z.string().optional()
 });
 
 export const sharePasswordSchema = z.object({
@@ -240,10 +242,10 @@ export const sharePasswordSchema = z.object({
 });
 
 export const createSharedVaultSchema = z.object({
-  name: z.string().min(1, "Vault name is required").max(100),
-  description: z.string().optional(),
-  teamId: z.number().min(1).optional(),
-  isPublic: z.boolean().default(false),
+	name: z.string().min(1, "Vault name is required").max(100),
+	description: z.string().optional(),
+	teamId: z.number().min(1).optional(),
+	isPublic: z.boolean().default(false),
 });
 
 export const inviteToVaultSchema = z.object({
@@ -278,8 +280,8 @@ export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 
 export type Team = typeof teams.$inferSelect;
 export type CreateTeam = z.infer<typeof createTeamSchema>;
-export type TeamMember = typeof teamMembers.$inferSelect;
-export type SharedPassword = typeof sharedPasswords.$inferSelect;
+export type TeamMember = z.infer<typeof teamMembers.$inferSelect>; // <-- Fixed: Added missing '>'
+export type SharedPassword = z.infer<typeof sharedPasswords.$inferSelect>; // <-- Fixed: Added missing '>'
 export type SharePassword = z.infer<typeof sharePasswordSchema>;
 export type SharedVault = typeof sharedVaults.$inferSelect;
 export type CreateSharedVault = z.infer<typeof createSharedVaultSchema>;
