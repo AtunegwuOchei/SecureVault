@@ -41,7 +41,6 @@ interface PasswordItemProps {
 
 const PasswordItem: React.FC<PasswordItemProps> = ({ password, onEdit }) => {
   const [showPassword, setShowPassword] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [decryptedPassword, setDecryptedPassword] = useState<string>("");
   const [shareData, setShareData] = useState({
@@ -54,7 +53,6 @@ const PasswordItem: React.FC<PasswordItemProps> = ({ password, onEdit }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Favorites mutation
   const toggleFavoriteMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch(`/api/passwords/${password.id}`, {
@@ -115,14 +113,12 @@ const PasswordItem: React.FC<PasswordItemProps> = ({ password, onEdit }) => {
     },
   });
 
-  // Delete mutation
   const deletePasswordMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest(
-        "DELETE", 
-        `/api/passwords/${password.id}`, 
-        undefined
-      );
+      const response = await fetch(`/api/passwords/${password.id}`, {
+        method: "DELETE"
+      });
+      if (!response.ok) throw new Error("Delete failed");
       return response.json();
     },
     onSuccess: () => {
@@ -141,7 +137,6 @@ const PasswordItem: React.FC<PasswordItemProps> = ({ password, onEdit }) => {
     },
   });
 
-  // Handle copy password
   const handleCopyPassword = () => {
     copyToClipboard(password.encryptedPassword);
     toast({
@@ -150,27 +145,11 @@ const PasswordItem: React.FC<PasswordItemProps> = ({ password, onEdit }) => {
     });
   };
 
-  // Handle toggle favorite
-  const handleToggleFavorite = () => {
-    toggleFavoriteMutation.mutate();
-  };
-
-  // Handle edit
-  const handleEdit = () => {
-    onEdit(password);
-  };
-
-  // Render strength badge
   const renderStrengthBadge = () => {
-    if (password.strength >= 80) {
-      return <Badge variant="success">Strong</Badge>;
-    } else if (password.strength >= 60) {
-      return <Badge variant="info">Good</Badge>;
-    } else if (password.strength >= 40) {
-      return <Badge variant="warning">Fair</Badge>;
-    } else {
-      return <Badge variant="destructive">Weak</Badge>;
-    }
+    if (password.strength >= 80) return <Badge variant="success">Strong</Badge>;
+    if (password.strength >= 60) return <Badge variant="info">Good</Badge>;
+    if (password.strength >= 40) return <Badge variant="warning">Fair</Badge>;
+    return <Badge variant="destructive">Weak</Badge>;
   };
 
   return (
@@ -197,24 +176,11 @@ const PasswordItem: React.FC<PasswordItemProps> = ({ password, onEdit }) => {
               type={showPassword ? "text" : "password"}
               value={password.encryptedPassword}
               readOnly
-              className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
+            <Button variant="ghost" size="icon" onClick={() => setShowPassword(!showPassword)}>
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleCopyPassword}
-            >
+            <Button variant="ghost" size="icon" onClick={handleCopyPassword}>
               <Copy className="h-4 w-4" />
             </Button>
           </div>
@@ -242,7 +208,7 @@ const PasswordItem: React.FC<PasswordItemProps> = ({ password, onEdit }) => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsEditOpen(true)}>
+              <DropdownMenuItem onClick={() => onEdit(password)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
@@ -250,17 +216,13 @@ const PasswordItem: React.FC<PasswordItemProps> = ({ password, onEdit }) => {
                 <Share2 className="mr-2 h-4 w-4" />
                 Share
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => toggleFavoriteMutation.mutate()}
-                disabled={toggleFavoriteMutation.isPending}
-              >
+              <DropdownMenuItem onClick={() => toggleFavoriteMutation.mutate()}>
                 <Star className={`mr-2 h-4 w-4 ${password.isFavorite ? "fill-yellow-400 text-yellow-400" : ""}`} />
                 {password.isFavorite ? "Remove from favorites" : "Add to favorites"}
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-red-600"
                 onClick={() => deletePasswordMutation.mutate()}
-                disabled={deletePasswordMutation.isPending}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
@@ -270,7 +232,7 @@ const PasswordItem: React.FC<PasswordItemProps> = ({ password, onEdit }) => {
         </div>
       </CardContent>
 
-      {/* Share Password Dialog */}
+      {/* Share Dialog (unchanged) */}
       <Dialog open={isShareOpen} onOpenChange={setIsShareOpen}>
         <DialogContent>
           <DialogHeader>
